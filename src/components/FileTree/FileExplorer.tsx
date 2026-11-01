@@ -4,11 +4,12 @@ import {
   FolderOpen, FolderPlus,
 } from 'lucide-react'
 import {
-  ROOT, childrenMap, createFile, createFolder, deleteNode, isDescendant, mkdirp, moveNode, pathOf, putFile, renameNode,
+  ROOT, childrenMap, createFile, createFolder, deleteNode, isDescendant, mkdirp, moveNode, pathOf, putFile, readFile, renameNode,
   type TreeNode,
 } from '../../services/fsService'
 import { collectDrop, type DroppedFile } from '../../lib/dropEntries'
 import { isScriptName, kindFromName } from '../../lib/fileTypes'
+import { saveBytes, saveZip } from '../../lib/download'
 
 interface Props {
   nodes: TreeNode[]
@@ -142,6 +143,27 @@ export function FileExplorer({ nodes, activeId, onOpen, onDeleted, onInsertPath 
     const msg = n.kind === 'folder' ? `Delete folder "${n.name}"${count ? ` and its ${count} item${count === 1 ? '' : 's'}` : ''}?` : `Delete "${n.name}"?`
     if (!confirm(msg)) return
     try { onDeleted(await deleteNode(id)); if (selected === id) setSelected(ROOT) } catch (e) { fail(e) }
+  }
+
+  /** A file is downloaded as it is stored (unsaved editor changes are not included); a folder as a .zip. */
+  const download = async (id: number) => {
+    const n = byId.get(id)
+    if (!n) return
+    setMenu(null)
+    try {
+      if (n.kind === 'file') { saveBytes(n.name, await readFile(id)); return }
+      const entries: Record<string, Uint8Array> = {}
+      const walk = async (parent: number, prefix: string) => {
+        const list = kids.get(parent) ?? []
+        if (list.length === 0 && prefix) entries[prefix] = new Uint8Array()
+        for (const c of list) {
+          if (c.kind === 'folder') await walk(c.id, `${prefix}${c.name}/`)
+          else entries[`${prefix}${c.name}`] = new Uint8Array(await readFile(c.id))
+        }
+      }
+      await walk(id, `${n.name}/`)
+      saveZip(`${n.name}.zip`, entries)
+    } catch (e) { fail(e) }
   }
 
   const importDropped = async (items: DroppedFile[], target: number) => {
@@ -348,6 +370,7 @@ export function FileExplorer({ nodes, activeId, onOpen, onDeleted, onInsertPath 
             <>
               <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
               {menuNode.kind === 'file' && <button role="menuitem" className={item} onClick={() => { setMenu(null); onInsertPath(pathOf(byId, menuNode.id)) }}>Insert path in editor</button>}
+              <button role="menuitem" className={item} onClick={() => void download(menuNode.id)}>{menuNode.kind === 'folder' ? 'Download as .zip' : 'Download'}</button>
               <button role="menuitem" className={item} onClick={() => { setMenu(null); setEdit({ kind: 'rename', id: menuNode.id }) }}>Rename <span className="float-right opacity-60">F2</span></button>
               <button role="menuitem" className={`${item} text-red-600 hover:text-white dark:text-red-400`} onClick={() => void remove(menuNode.id)}>Delete <span className="float-right opacity-60">Del</span></button>
             </>

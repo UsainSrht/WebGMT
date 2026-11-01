@@ -177,6 +177,7 @@ export default function App() {
     if (running || activeId == null || !activeNode || activeDoc?.kind !== 'text' || activeLanguage !== 'gmt') return
     const scriptId = activeId
     const content = activeDoc.text
+    await save(scriptId) // running a script saves it first
     setRunning(true); setLogs([]); setMarkers({ id: scriptId, list: [] })
     const collected: LogEntry[] = []
     const onLog = (e: LogEntry) => { collected.push(e); setLogs((l) => [...l, e]) }
@@ -199,7 +200,7 @@ export default function App() {
     }
     await db.history.add({ scriptId, executedAt: Date.now(), status, executionTimeMs: ms })
     setRunning(false)
-  }, [running, activeId, activeNode, activeDoc, activeLanguage, docs, byId])
+  }, [running, activeId, activeNode, activeDoc, activeLanguage, docs, byId, save])
 
   // ---------------------------------------------------------------- rendering
   const tabInfos: TabInfo[] = tabs.flatMap((id) => {
