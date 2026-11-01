@@ -1,5 +1,7 @@
 # WebGMT
 
+Source: https://github.com/UsainSrht/WebGMT · Live: https://webgmt.pages.dev
+
 A serverless, client-side IDE for [GMT](https://www.generic-mapping-tools.org/) scripts. React 19 + TypeScript + Vite + Tailwind, Monaco editor, Dexie (IndexedDB) storage, GMT running in a Web Worker. Deployable to Cloudflare Pages.
 
 ```bash
@@ -13,13 +15,13 @@ npm run verify:dist  # checks dist/ and the COOP/COEP headers file
 
 | Engine | When | What it does |
 |---|---|---|
-| **GMT Wasm** (deployed) | `public/gmt/gmt.js` + `gmt.wasm` exist | Real GMT 6.6.0 with real GSHHG coastlines (crude + low resolution). Output is PostScript, converted to SVG in the browser by `src/workers/psInterpreter.ts` |
+| **GMT Wasm** (deployed) | `public/gmt/gmt.js` + `gmt.wasm` exist | Real GMT 6.6.0 with real GSHHG coastlines (crude to high resolution, plus borders and rivers). Output is PostScript, converted to SVG in the browser by `src/workers/psInterpreter.ts` |
 | **Mock** (fallback) | no Wasm build present | Draws SVG directly for a **subset** of GMT (`basemap`, `coast` with crude hand-made outlines, `plot`, `text`, `makecpt`, `colorbar`, `contour`). It is not GMT and its output differs |
 
 Verified on the Wasm engine: the three bundled examples, and ten real course scripts (time and log axes, text/fonts/equations, 3-D perspective plots, nine map projections, filled contours, `grdimage`/`grdview`, profiles with `gmt project`/`grdtrack`) compared against real GMT output, locally and on the deployed site. Not verified: other modules, very large inputs, non-Chromium browsers.
 
 Known limits of the Wasm build:
-- **No Ghostscript**, so `psconvert` fails. Modern-mode `gmt end` therefore reports a psconvert error, which the worker hides; it then reads GMT's raw figure file (`gmt_N.ps-`) from the session directory and renders it itself, cropping to the painted content. Only the first figure is used.
+- **No Ghostscript**, so `psconvert` fails. Modern-mode `gmt end` therefore reports a psconvert error, which the worker hides; it then reads GMT's raw figure file (`gmt_N.ps-`) from the session directory and renders it itself, cropping to the painted content. Every `gmt begin … gmt end` block becomes its own figure.
 - `gmt begin name png` is rewritten to `ps`.
 - **No network**: libcurl is linked only because GMT 6.6 requires it to compile and is stubbed to fail instantly. Remote datasets (`@earth_relief` etc.) are unavailable; GSHHG shorelines are bundled instead (`public/gmt/data`: crude, low, intermediate, high, plus borders and rivers). Full resolution (`-Df`, 30 MiB) exceeds the Pages file limit and is served from the high-resolution file with a note.
 - The `supplements` plugin (`mgd77`, `gshhg`, `img`, …) is not built, and the share data for `mgd77`/`spotter`/`x2sys` is trimmed to keep `gmt.wasm` under Cloudflare Pages' 25 MiB file limit (currently ~17 MB).
@@ -64,4 +66,4 @@ WebGMT is MIT licensed (see [LICENSE](LICENSE)), made by [UsainSrht](https://git
 
 ## Not implemented
 
-`pdfjs-dist` and `d3-zoom` from the original spec are not used (CSS transforms and an SVG pipeline instead). No automated test suite.
+`pdfjs-dist` and `d3-zoom` from the original spec are not used (CSS transforms and an SVG pipeline instead). The Wasm engine, renderer and explorer UI are not covered by automated tests (see Tests).

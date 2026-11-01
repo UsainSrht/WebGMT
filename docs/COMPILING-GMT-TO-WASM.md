@@ -181,7 +181,7 @@ Process mistakes are marked **(process)**. The rest are build or runtime failure
 
 ## 7. Known gaps (so you do not rediscover them)
 
-- No Ghostscript: `psconvert`, and therefore PNG/PDF/EPS from GMT itself, is unavailable. We convert PostScript ourselves; only the first figure of a script is used.
+- No Ghostscript: `psconvert`, and therefore PNG/PDF/EPS from GMT itself, is unavailable. We convert PostScript ourselves; every `gmt begin … gmt end` block becomes a figure.
 - No network: remote data (`@earth_relief`, `@tut_data`) cannot be fetched; libcurl exists only to satisfy the compiler.
 - The supplements (`mgd77`, `gshhg` module, `img`, `x2sys`, `spotter`...) are not built.
 - The standalone `gmt` executable is not built (M15).
@@ -189,4 +189,4 @@ Process mistakes are marked **(process)**. The rest are build or runtime failure
 - The PostScript interpreter was checked against the real output of ten scripts (basemaps with time/log axes, text and fonts, 3-D perspective, many map projections, filled contours, grdimage/grdview, profiles). Not handled: `-Gp` pattern fills (`makepattern`), `imagemask`, non-ASCII85 image encodings, the `Interpolate` image flag. Unknown operators are logged to the console and skipped.
 - Full-resolution shorelines (`-Df`) fall back to high resolution (see item 12 above).
 - The shell runner has no `if`/`while`/functions/`$(( ))`; such lines are reported, not run. `ip a` returns nothing (a browser cannot see network interfaces), so `qrencode` strings that include a MAC address omit it.
-- Tests: `npm test` runs `tests/awk.test.ts` (our awk vs the system awk) and `tests/shell.test.ts` (pipes, heredocs, substitution, loops, error continuation). There is no automated test of the Wasm engine or the renderer; those were checked by running scripts in headless Chrome and comparing with real GMT output.
+- Tests: `npm test` runs `tests/awk.test.ts` (our awk vs the system awk) `tests/shell.test.ts` and `tests/files.test.ts` (pipes, heredocs, substitution, loops, error continuation). There is no automated test of the Wasm engine or the renderer; those were checked by running scripts in headless Chrome and comparing with real GMT output.

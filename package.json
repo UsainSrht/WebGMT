@@ -1,6 +1,11 @@
 {
   "name": "webgmt",
   "private": true,
+  "description": "WebGMT: GMT 6.6.0 compiled to WebAssembly, an in-browser IDE for Generic Mapping Tools scripts",
+  "license": "MIT",
+  "author": "UsainSrht (https://github.com/UsainSrht)",
+  "homepage": "https://github.com/UsainSrht/WebGMT",
+  "repository": { "type": "git", "url": "git+https://github.com/UsainSrht/WebGMT.git" },
   "version": "1.0.0",
   "type": "module",
   "scripts": {
