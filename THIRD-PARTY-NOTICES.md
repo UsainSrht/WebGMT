@@ -25,6 +25,15 @@ rebuild `gmt.wasm` from the unmodified GMT 6.6.0 sources, or replace GMT with an
 GMT is not modified; only a small wrapper and a dlopen/dlsym shim are added at link time. FFTW is built by the
 Dockerfile for completeness but is **not** linked into `gmt.wasm` (FFTW is GPL).
 
+## Data bundled in `public/gmt/remote/` (copies of files from the GMT data server)
+
+| File | Source |
+|---|---|
+| `earth_relief_05m_p.grd`, `10m`, `30m`, `01d` | SRTM15+ v2.7 global relief, Tozer, B., Sandwell, D. T., Smith, W. H. F., Olson, C., Beale, J. R., & Wessel, P. (2019), *Earth and Space Science*, 6, 1847-1864, doi:10.1029/2019EA000658, as distributed by the GMT data server. The 05m grid was converted from the server's JPEG 2000 tiles to netCDF without changing the values. |
+| `tut_ship.xyz`, `tut_quakes.ngdc`, `otemp.anal1deg.nc`, `tut_bathy.nc`, `tut_relief.nc`, `tut_data.txt` | The GMT tutorial datasets (ship soundings, NOAA NCEI tsunami earthquake catalogue, NOAA World Ocean Atlas temperatures, ETOPO5 and USGS DEM subsets), as distributed by the GMT data server for the official tutorial. |
+
+Please check the terms of the original data providers before reusing these files outside of the tutorial and demo.
+
 ## npm packages in the web app
 
 React, React DOM, Monaco Editor, `@monaco-editor/react`, Dexie, `dexie-react-hooks`, Tailwind CSS, `clsx`,

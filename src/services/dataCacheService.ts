@@ -37,8 +37,9 @@ async function fetchData(url: string): Promise<Response | null> {
   return res
 }
 
-export async function loadDataFile(name: string): Promise<ArrayBuffer | null> {
-  const url = `/gmt/data/${name}`
+/** dir is the folder under /gmt/ the file is served from: 'data' (coastlines) or 'remote' (tutorial data, earth_relief) */
+export async function loadDataFile(name: string, dir: 'data' | 'remote' = 'data'): Promise<ArrayBuffer | null> {
+  const url = `/gmt/${dir}/${name}`
   try {
     let cache: Cache | null = null
     try { cache = await caches.open(CACHE_NAME) } catch { /* CacheStorage can be unavailable (private mode, blocked storage) */ }

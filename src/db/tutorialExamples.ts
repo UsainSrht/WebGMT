@@ -1,0 +1,23 @@
+// Generated from the GMT 6.6 bash tutorial (https://docs.generic-mapping-tools.org/6.6/tutorial.html): one script per figure.
+// Seeded into examples/gmt-tutorial on a fresh install. Data (@tut_*, @earth_relief_*) comes from public/gmt/remote.
+export const TUTORIAL_SCRIPTS: [string, string][] = [
+  ["tut_01.sh", "#!/bin/bash\n# GMT tutorial, figure 1\ngmt begin GMT_tut_1\n\tgmt basemap -R10/70/-3/8 -JX4i/3i -B -B+glightred+t\"My first plot\"\ngmt end show\n"],
+  ["tut_02.sh", "#!/bin/bash\n# GMT tutorial, figure 2\ngmt begin GMT_tut_2\n\tgmt basemap -R1/10000/1e20/1e25 -JX9il/6il -Bxa2+l\"Wavelength (m)\" -Bya1pf3+l\"Power (W)\" -BWS\ngmt end show\n"],
+  ["tut_03.sh", "#!/bin/bash\n# GMT tutorial, figure 3\ngmt begin GMT_tut_3\n\tgmt coast -R-90/-70/0/20 -JM6i -B -Gchocolate\ngmt end show\n"],
+  ["tut_04.sh", "#!/bin/bash\n# GMT tutorial, figure 4\ngmt begin GMT_tut_4\n\tgmt coast -R-130/-70/24/52 -JB-100/35/33/45/6i -B -B+t\"Conic Projection\" -N1/thicker -N2/thinnest -A500 -Ggray -Wthinnest\ngmt end show\n"],
+  ["tut_05.sh", "#!/bin/bash\n# GMT tutorial, figure 5\ngmt begin GMT_tut_5\n\tgmt coast -Rg -JG280/30/6i -Bag -Dc -A5000 -Gwhite -SDarkTurquoise\ngmt end show\n"],
+  ["tut_06.sh", "#!/bin/bash\n# GMT tutorial, figure 6\ngmt begin GMT_tut_6\n\tgmt coast -Rg -JKs180/9i -Bag -Dc -A5000 -Gchocolate -SDarkTurquoise -Wthinnest\ngmt end show\n"],
+  ["tut_07.sh", "#!/bin/bash\n# GMT tutorial, figure 7\ngmt begin GMT_tut_7\n\tgmt plot @tut_data.txt -R0/6/0/6 -Jx1i -B -Wthinner\ngmt end show\n"],
+  ["tut_08.sh", "#!/bin/bash\n# GMT tutorial, figure 8\ngmt begin GMT_tut_8\n\tgmt plot @tut_data.txt -R0/6/0/6 -Jx1i -B -Wthinner\n\tgmt plot @tut_data.txt -W -Si0.2i\ngmt end show\n"],
+  ["tut_09.sh", "#!/bin/bash\n# GMT tutorial, figure 9\ngmt begin GMT_tut_9\n\tgmt makecpt -Cred,green,blue -T0,100,300,10000\n\tgmt coast -R130/150/35/50 -JM6i -B -Ggray\n\tgmt plot @tut_quakes.ngdc -Wfaint -i4,3,5,6+s0.1 -h3 -Scc -C\ngmt end show\n"],
+  ["tut_10.sh", "#!/bin/bash\n# GMT tutorial, figure 10\ngmt begin GMT_tut_10\n\tgmt text -R0/7/0/5 -Jx1i -B -F+f30p,Times-Roman,DarkOrange+jBL << EOF\n1  1  It's P@al, not Pal!\n1  2  Try @%33%ZapfChancery@%% today\n1  3  @~D@~g@-b@- = 2@~pr@~G@~D@~h.\n1  4  University of Hawaii at M@!a\\225noa\nEOF\ngmt end show\n"],
+  ["tut_11.sh", "#!/bin/bash\n# GMT tutorial, figure 11\ngmt begin GMT_tut_11\n\tgmt grdcontour @earth_relief_05m -R-66/-60/30/35 -JM6i -C250 -A1000 -B\ngmt end show\n"],
+  ["tut_12.sh", "#!/bin/bash\n# GMT tutorial, figure 12\ngmt begin GMT_tut_12\n\tgmt nearneighbor -R245/255/20/30 -I5m -S40k -Gship.nc @tut_ship.xyz\n\tgmt grdcontour ship.nc -JM6i -B -C250 -A1000\ngmt end show\n"],
+  ["tut_13.sh", "#!/bin/bash\n# GMT tutorial, figure 13\ngmt blockmedian -R245/255/20/30 -I5m -V @tut_ship.xyz > ship_5m.xyz\ngmt surface ship_5m.xyz -R245/255/20/30 -I5m -Gship.nc\ngmt begin GMT_tut_13\n\tgmt mask -R245/255/20/30 -I5m ship_5m.xyz -JM6i -B\n\tgmt grdcontour ship.nc -C250 -A1000\n\tgmt mask -C\ngmt end show\n"],
+  ["tut_14.sh", "#!/bin/bash\n# GMT tutorial, figure 14\ngmt begin GMT_tut_14\n\tgmt makecpt -H -Crainbow -T-20/60/10 > disc.cpt\n\tgmt makecpt -H -Crainbow -T-20/60 > cont.cpt\n\tgmt basemap -R0/6/0/9 -Jx1i -B0\n\tgmt colorbar -Dx1i/1i+w4i/0.5i+h -Cdisc.cpt -Ba -B+tdiscrete\n\tgmt colorbar -Dx1i/3i+w4i/0.5i+h -Ccont.cpt -Ba -B+tcontinuous\n\tgmt colorbar -Dx1i/5i+w4i/0.5i+h -Cdisc.cpt -Ba -B+tdiscrete -I0.5\n\tgmt colorbar -Dx1i/7i+w4i/0.5i+h -Ccont.cpt -Ba -B+tcontinuous -I0.5\ngmt end show\n"],
+  ["tut_15.sh", "#!/bin/bash\n# GMT tutorial, figure 15\ngmt begin GMT_tut_15\n\tgmt makecpt -Crainbow -T1000/5000\n\tgmt grdimage @earth_relief_30s -R-108/-103/35/40 -JM6i -B -BWSnE\n\tgmt colorbar -DJTC -I0.4 -Bxa -By+lm\ngmt end show\n"],
+  ["tut_16.sh", "#!/bin/bash\n# GMT tutorial, figure 16\ngmt begin GMT_tut_16\n\tgmt makecpt -Crainbow -T1000/5000\n\tgmt grdimage @earth_relief_30s -R-108/-103/35/40 -I+a100+ne0.8 -JM6i -B -BWSnE\n\tgmt colorbar -DJTC -I0.4 -Bxa -By+lm\ngmt end show\n"],
+  ["tut_17.sh", "#!/bin/bash\n# GMT tutorial, figure 17\ngmt begin GMT_tut_17\n\tgmt makecpt -Cno_green -T-2/30/2\n\tgmt grdimage -Rg -JW180/9i \"@otemp.anal1deg.nc?otemp[2,0]\" -Bag\ngmt end show\n"],
+  ["tut_18.sh", "#!/bin/bash\n# GMT tutorial, figure 18\ngmt begin GMT_tut_18\n\tgmt grdview @earth_relief_05m -R-66/-60/30/35 -JM5i -JZ2i -p135/30 -B\ngmt end show\n"],
+  ["tut_19.sh", "#!/bin/bash\n# GMT tutorial, figure 19\ngmt begin GMT_tut_19\n\tgmt makecpt -Cdem2 -T1000/5000\n\tgmt grdview @earth_relief_30s -R-108/-103/35/40 -JM4i -p135/35 -Qi50 -I+a100+ne0.8 -B -JZ0.5i\ngmt end show\n"],
+]

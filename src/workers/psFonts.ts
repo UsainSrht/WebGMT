@@ -28,7 +28,8 @@ export function stringWidth(font: string, size: number, s: string): number {
   for (let i = 0; i < s.length; i++) {
     const c = s.charCodeAt(i)
     // ISOLatin1+: 0x2D is a minus (as wide as '+'), 0xAD the hyphen
-    t += c === 45 ? m.w[43 - 32] : c === 0xad ? m.w[45 - 32] : c >= 32 && c <= 126 ? m.w[c - 32] : 556
+    // 0x90-0x9F are ISOLatin1+ spacing accents (dotlessi 278, the rest 333 in Helvetica and Times)
+    t += c === 45 ? m.w[43 - 32] : c === 0xad ? m.w[45 - 32] : c >= 32 && c <= 126 ? m.w[c - 32] : c === 0x90 ? 278 : c > 0x90 && c <= 0x9f ? 333 : 556
   }
   return (t * m.scale * size) / 1000
 }
@@ -62,4 +63,8 @@ export const symbolText = (s: string) => Array.from(s).map((c) => SYMBOL[c] ?? c
 
 /** GMT's default ISOLatin1+ encoding differs from plain Latin-1: 0x2D is a true minus sign, 0xAD is the hyphen,
  *  and 0x27 / 0x60 are the typographic right/left single quotes. */
-export const latinPlus = (s: string) => s.replace(/[-\u00AD'`]/g, (c) => (c === '-' ? '\u2212' : c === '\u00AD' ? '-' : c === "'" ? '\u2019' : '\u2018'))
+/** ISOLatin1+ 0x90-0x9F hold the spacing accents (plain Latin-1 has control characters there): dotlessi, grave, acute,
+ *  circumflex, tilde, macron, breve, dotaccent, dieresis, (none), ring, cedilla, (none), hungarumlaut, ogonek, caron. */
+const ACCENTS = ['\u0131', '`', '\u00B4', '\u02C6', '\u02DC', '\u00AF', '\u02D8', '\u02D9', '\u00A8', '', '\u02DA', '\u00B8', '', '\u02DD', '\u02DB', '\u02C7']
+export const latinPlus = (s: string) =>
+  s.replace(/[-\u00AD'`\u0090-\u009F]/g, (c) => (c === '-' ? '\u2212' : c === '\u00AD' ? '-' : c === "'" ? '\u2019' : c === '`' ? '\u2018' : ACCENTS[c.charCodeAt(0) - 0x90]))

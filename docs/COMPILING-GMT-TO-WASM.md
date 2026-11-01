@@ -109,6 +109,9 @@ Rendering: PostScript is converted to SVG by our own interpreter (`src/workers/p
 - **ISOLatin1+ encoding**: byte `0x2D` is a true minus sign, `0xAD` is the hyphen (invisible as a soft hyphen if passed through), `0x27`/`0x60` are curly quotes. GMT font 33 is Zapf Chancery Italic and font 12 is Symbol (`@~p@~` is pi).
 - **Images**: `grdimage`, colorbars and EPS pictures are `<< /ImageType 1 … /DataSource currentfile /ASCII85Decode filter /FlateDecode filter >> image` with the data *inside the PostScript stream*. Extract it before tokenizing, decode (ASCII85, Flate via `fflate`), convert indexed/RGB/gray samples, encode a PNG (a worker has no canvas) and emit an SVG `<image>` with the matrix `inverse(ImageMatrix) × CTM × y-flip`.
 - **Landscape pages** (`%%Orientation: Landscape`, chosen when the plot is wider than the page) are rotated back to upright, as `psconvert -P` does, and the crop is to what was painted, **not** the page: a script can stack panels far taller than one sheet (`-Y-6i`).
+- **Executable strings.** GMT stores pens as strings and runs them with `PSL_path_pen N get cvx exec` (contours, annotated contours); `cvx` on a string must make it executable and `exec` must tokenize and run it, or every contour gets the default pen.
+- **Text uses the full matrix and `textLength`.** 3-D axis labels are sheared by the CTM, and the browser's fallback font is never exactly as wide as the metrics GMT laid the text out with, so each run is emitted as `matrix(...)` with `textLength` equal to the advance used for the next word.
+- **ISOLatin1+ accents.** 0x90-0x9F are spacing accents (dotlessi, grave, acute, circumflex, tilde, macron, breve, dotaccent, dieresis, ring, cedilla, hungarumlaut, ogonek, caron), 333 units wide in Helvetica and Times; `@!a\225` overstrikes a macron on an `a`.
 - Hairlines: strokes thinner than 0.25 pt are drawn at 0.25 pt, because PDF viewers draw hairlines at one device pixel and the real outputs look that way.
 
 ---

@@ -18,15 +18,19 @@ npm run verify:dist  # checks dist/ and the COOP/COEP headers file
 | **GMT Wasm** (deployed) | `public/gmt/gmt.js` + `gmt.wasm` exist | Real GMT 6.6.0 with real GSHHG coastlines (crude to high resolution, plus borders and rivers). Output is PostScript, converted to SVG in the browser by `src/workers/psInterpreter.ts` |
 | **Mock** (fallback) | no Wasm build present | Draws SVG directly for a **subset** of GMT (`basemap`, `coast` with crude hand-made outlines, `plot`, `text`, `makecpt`, `colorbar`, `contour`). It is not GMT and its output differs |
 
-Verified on the Wasm engine: the three bundled examples, and ten real course scripts (time and log axes, text/fonts/equations, 3-D perspective plots, nine map projections, filled contours, `grdimage`/`grdview`, profiles with `gmt project`/`grdtrack`) compared against real GMT output, locally and on the deployed site. Not verified: other modules, very large inputs, non-Chromium browsers.
+Verified on the Wasm engine: the three bundled examples, all 19 figures of the official GMT tutorial (see [docs/TUTORIAL-RESULTS.md](docs/TUTORIAL-RESULTS.md)), and ten real course scripts (time and log axes, text/fonts/equations, 3-D perspective plots, nine map projections, filled contours, `grdimage`/`grdview`, profiles with `gmt project`/`grdtrack`) compared against real GMT output, locally and on the deployed site. Not verified: other modules, very large inputs, non-Chromium browsers.
 
 Known limits of the Wasm build:
 - **No Ghostscript**, so `psconvert` fails. Modern-mode `gmt end` therefore reports a psconvert error, which the worker hides; it then reads GMT's raw figure file (`gmt_N.ps-`) from the session directory and renders it itself, cropping to the painted content. Every `gmt begin … gmt end` block becomes its own figure.
 - `gmt begin name png` is rewritten to `ps`.
-- **No network**: libcurl is linked only because GMT 6.6 requires it to compile and is stubbed to fail instantly. Remote datasets (`@earth_relief` etc.) are unavailable; GSHHG shorelines are bundled instead (`public/gmt/data`: crude, low, intermediate, high, plus borders and rivers). Full resolution (`-Df`, 30 MiB) exceeds the Pages file limit and is served from the high-resolution file with a note.
+- **No network**: libcurl is linked only because GMT 6.6 requires it to compile and is stubbed to fail instantly. `@name` files cannot come from the GMT data server (a browser may not fetch it: no CORS headers), so they are served from `public/gmt/remote/` (see "Remote data" below); GSHHG shorelines are bundled too (`public/gmt/data`: crude, low, intermediate, high, plus borders and rivers). Full resolution (`-Df`, 30 MiB) exceeds the Pages file limit and is served from the high-resolution file with a note.
 - The `supplements` plugin (`mgd77`, `gshhg`, `img`, …) is not built, and the share data for `mgd77`/`spotter`/`x2sys` is trimmed to keep `gmt.wasm` under Cloudflare Pages' 25 MiB file limit (currently ~17 MB).
 - `psInterpreter.ts` is our own PostScript-to-SVG interpreter for GMT's output (paths, text with real font metrics, clipping, images, landscape rotation). Not handled: `-Gp` pattern fills, `imagemask`. Unknown operators are reported in the console and skipped.
 - PDF export embeds a raster image; it is not vector.
+
+## Remote data
+
+`@name` arguments are rewritten (`src/services/remoteData.ts`) to bundled copies in `public/gmt/remote/`, fetched on demand and cached: the tutorial files (`@tut_data.txt`, `@tut_quakes.ngdc`, `@tut_ship.xyz`, `@tut_bathy.nc`, `@tut_relief.nc`, `@otemp.anal1deg.nc`) and the global `@earth_relief_01d`, `30m`, `10m` and `05m` grids (SRTM15+ v2.7, pixel registered; the 05m file was converted from the server's JPEG 2000 tiles with GDAL). The 30 arc-second tutorial region (-108/-103/35/40) is bundled as a subset. Any other `@earth_relief_*` resolution falls back to the 10m grid with a note in the console. About 33 MB of data in total; none of it is loaded until a script uses it.
 
 ## Rebuilding the Wasm engine
 
@@ -58,7 +62,7 @@ Needs Docker with ~8 GB RAM available to the VM; every parallel build step is ca
 
 ## Tests
 
-`npm test` runs `tests/awk.test.ts` (our awk against the system awk, 16 programs), `tests/shell.test.ts` (pipes, heredocs, substitution, loops, error behaviour) and `tests/files.test.ts` (path helpers, text/image/binary detection). The Wasm engine, renderer and explorer UI have no automated tests in the repository; they were checked by driving headless Chrome and comparing the output with real GMT results.
+`npm test` runs `tests/awk.test.ts` (our awk against the system awk, 16 programs), `tests/shell.test.ts` (pipes, heredocs, substitution, loops, error behaviour) and `tests/files.test.ts` (path helpers, text/image/binary detection), `tests/remote.test.ts` (`@name` rewriting) and `tests/ps.test.ts` (PostScript interpreter regressions). The Wasm engine, renderer and explorer UI have no automated tests in the repository; they were checked by driving headless Chrome and comparing the output with real GMT results.
 
 ## License
 

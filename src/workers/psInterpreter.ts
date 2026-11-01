@@ -138,7 +138,8 @@ export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, valu
       else out.push(`<path d="${d}" fill="${gs.fill}" fill-rule="${mode === 'eofill' ? 'evenodd' : 'nonzero'}" stroke="none"/>`)
     }
     for (const r of runs) {
-      if (mode === 'stroke') emitText(r.text, r.ux, r.uy, r.font, r.m, `fill="none" stroke="${gs.fill}" stroke-width="${fmt(Math.max(gs.lw * scaleOf(gs.ctm), 0.05))}" stroke-linejoin="round"`)
+      // text is drawn in user units (the matrix carries the scale), so the outline width is in user units too
+      if (mode === 'stroke') emitText(r.text, r.ux, r.uy, r.font, r.m, `fill="none" stroke="${gs.fill}" stroke-width="${+Math.max(gs.lw, 0.05 / scaleOf(r.m)).toFixed(4)}" stroke-linejoin="round"`)
       else emitText(r.text, r.ux, r.uy, r.font, r.m, `fill="${gs.fill}"`)
     }
     gs.path = []; gs.runs = []
@@ -158,15 +159,21 @@ export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, valu
     gs = prev
   }
   const emitText = (str: string, ux: number, uy: number, font: { name: string; size: number }, m: Mat, paintAttrs: string) => {
-    const [x, y] = pt(ux, uy)
+    // position with the matrix of the text itself (a run painted later may follow a CTM change)
+    const [ax, ay] = apply(m, ux, uy)
+    const x = ax - bx0, y = H - (ay - by0)
     const size = font.size * scaleOf(m)
     const ang = (Math.atan2(m[1], m[0]) * -180) / Math.PI
     const f = font.name
     const family = /Times/i.test(f) ? 'Times New Roman, Times, serif' : /Courier/i.test(f) ? 'Courier New, Courier, monospace' : /AvantGarde/i.test(f) ? 'Century Gothic, Avant Garde, Helvetica, sans-serif' : /Bookman/i.test(f) ? 'Bookman Old Style, Bookman, serif' : /NewCentury/i.test(f) ? 'Century Schoolbook, serif' : /Palatino/i.test(f) ? 'Palatino Linotype, Palatino, serif' : /Chancery/i.test(f) ? 'Zapf Chancery, Apple Chancery, Times New Roman, serif' : isSymbolFont(f) ? 'Symbol, Times New Roman, serif' : 'Helvetica, Arial, sans-serif'
     const bold = /Bold|Demi/i.test(f) ? ' font-weight="bold"' : '', ital = /Oblique|Italic/i.test(f) ? ' font-style="italic"' : ''
     const text = (isSymbolFont(f) ? symbolText(str) : latinPlus(str)).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    out.push(`<text x="0" y="0" transform="translate(${fmt(x)} ${fmt(y)}) rotate(${fmt(ang)})" font-family="${family}" font-size="${fmt(size)}"${bold}${ital} ${paintAttrs} xml:space="preserve">${text}</text>`)
+    // The full matrix (not just rotation) is applied, so 3-D plots, whose axis labels are sheared along the axes, look
+    // right. textLength makes the glyphs fill exactly the advance width we use to place what follows, whatever
+    // fallback font the browser picks for the PostScript font.
     const adv = stringWidth(f, font.size, str)
+    const n6 = (v: number) => +v.toFixed(6)
+    out.push(`<text x="0" y="0" transform="matrix(${n6(m[0])} ${n6(-m[1])} ${n6(-m[2])} ${n6(m[3])} ${fmt(x)} ${fmt(y)})" font-family="${family}" font-size="${n6(font.size)}"${bold}${ital} textLength="${n6(adv)}" lengthAdjust="spacingAndGlyphs" ${paintAttrs} xml:space="preserve">${text}</text>`)
     // advance along the text direction for the bounds
     const dx = Math.cos((ang * Math.PI) / -180), dy = Math.sin((ang * Math.PI) / -180)
     for (const t of [0, 1]) grow(x + dx * adv * scaleOf(m) * t, y - dy * adv * scaleOf(m) * t, size * 0.8)
@@ -236,7 +243,8 @@ export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, valu
     cvi: () => { const v = ostack.pop(); ostack.push(Math.trunc(typeof v === 'number' ? v : parseFloat(v?.str ?? '0'))) },
     cvr: () => { const v = ostack.pop(); ostack.push(typeof v === 'number' ? v : parseFloat(v?.str ?? '0')) },
     cvs: () => { const s = ostack.pop(); const v = ostack.pop(); ostack.push({ str: String(isStr(v) ? v.str : isName(v) ? v.name : v) }); void s },
-    cvx: () => { const v = ostack.pop(); ostack.push(isName(v) ? { ...v, lit: false } : v) },
+    // an executable string (GMT stores pens as strings: `PSL_path_pen 3 get cvx exec`) is tokenized and run by exec
+    cvx: () => { const v = ostack.pop(); ostack.push(isName(v) ? { ...v, lit: false } : isStr(v) ? { ...v, xstr: true } : v) },
     cvlit: () => { const v = ostack.pop(); ostack.push(isName(v) ? { ...v, lit: true } : v) },
     eq: () => { const b = ostack.pop(), a = ostack.pop(); ostack.push((a?.str ?? a?.name ?? a) === (b?.str ?? b?.name ?? b)) },
     ne: () => { const b = ostack.pop(), a = ostack.pop(); ostack.push((a?.str ?? a?.name ?? a) !== (b?.str ?? b?.name ?? b)) },
@@ -440,6 +448,7 @@ export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, valu
   function exec(o: Obj) {
     if (isProc(o)) { runTokens(o.proc); return }
     if (isName(o) && !o.lit) { execName(o.name); return }
+    if (isStr(o) && o.xstr) { runTokens(tokenize(o.str)); return }
     ostack.push(o)
   }
   function execName(name: string) {

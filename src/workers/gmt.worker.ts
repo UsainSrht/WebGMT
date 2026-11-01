@@ -3,6 +3,7 @@ import { runShell, type ShellRuntime, type Vfs } from '../lib/shell'
 import { dirname, normalize, relative, resolveFrom } from '../lib/paths'
 import { createMock } from './mockEngine'
 import { coastFilesFor, loadDataFile } from '../services/dataCacheService'
+import { REMOTE_DIR, resolveRemote } from '../services/remoteData'
 import type { LogEntry, WorkerRequest, WorkerResponse } from '../types'
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope
@@ -119,7 +120,8 @@ async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
     if (m.type === 'result') for (const f of m.figures) if (f.ps) transfer.push(f.ps)
     ctx.postMessage(m, transfer)
   }
-  const log = (entry: LogEntry) => post({ type: 'log', id: req.id, entry })
+  // bundled "@name" data lives under /gmt-remote; show the name the user typed
+  const log = (entry: LogEntry) => post({ type: 'log', id: req.id, entry: { ...entry, text: entry.text.split(REMOTE_DIR + '/').join('') } })
   currentLogger = log
 
   const engine = await loadWasm()
@@ -151,8 +153,8 @@ async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
     const r = await runShell(req.script, rt)
     ok = ok && r.ok
     if (figures.length === 0) { const svg = mock.finish(); if (svg) figures.push({ name: 'figure 1', svg }) }
-    if (figures.length === 0 && ok) log({ stream: 'stderr', text: '[WARNING]: script produced no map' })
-    post({ type: 'result', id: req.id, ok: ok && figures.length > 0, engine: 'mock', figures, durationMs: performance.now() - t0 })
+    if (figures.length === 0 && ok) log({ stream: 'info', text: 'No figure was produced (no gmt begin ... gmt end block); the text output is above.' })
+    post({ type: 'result', id: req.id, ok, engine: 'mock', figures, durationMs: performance.now() - t0 })
     return
   }
 
@@ -194,6 +196,20 @@ async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
       } else if (module === 'figure') {
         figName = args[0] ?? figName
         if (args.length > 1 && !args[1].startsWith('-')) args = [args[0], 'ps', ...args.slice(2)]
+      }
+      // "@tut_data.txt", "@earth_relief_10m", ...: GMT would download these; use the bundled copies
+      const remote = resolveRemote(args)
+      if (remote) {
+        args = remote.args
+        for (const n of remote.notes) log({ stream: 'info', text: `[NOTE]: ${n}`, line })
+        for (const f of remote.files) {
+          if (mounted.has(REMOTE_DIR + '/' + f.file)) continue
+          const data = await loadDataFile(f.file, 'remote')
+          if (!data) { log({ stream: 'stderr', text: `[ERROR]: bundled data file ${f.file} is not deployed under /gmt/remote/`, line }); continue }
+          try { FS.mkdirTree(REMOTE_DIR) } catch { /* exists */ }
+          FS.writeFile(`${REMOTE_DIR}/${f.file}`, new Uint8Array(data))
+          mounted.add(REMOTE_DIR + '/' + f.file)
+        }
       }
       if (module === 'coast') {
         const need = coastFilesFor(args)
@@ -260,8 +276,8 @@ async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
       figures.push({ name: n, ps: (FS.readFile(`${cwdPath}/${n}`) as Uint8Array).slice().buffer })
     }
   }
-  if (figures.length === 0 && ok) log({ stream: 'stderr', text: '[WARNING]: no PostScript output was produced' })
-  post({ type: 'result', id: req.id, ok: ok && figures.length > 0, engine: 'wasm', figures, durationMs: performance.now() - t0 })
+  if (figures.length === 0 && ok) log({ stream: 'info', text: 'No figure was produced (no gmt begin ... gmt end block); the text output is above.' })
+  post({ type: 'result', id: req.id, ok, engine: 'wasm', figures, durationMs: performance.now() - t0 })
 }
 
 ctx.onmessage = (e: MessageEvent<WorkerRequest>) => {

@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable, type Transaction } from 'dexie'
 import type { BlobRecord, FileRecord, HistoryRecord, NodeRecord, ScriptRecord } from '../types'
 import { uniqueName } from '../lib/paths'
+import { TUTORIAL_SCRIPTS } from './tutorialExamples'
 
 class WebGmtDB extends Dexie {
   /** v1 tables, only read by the v2 upgrade (scripts and data files used to be separate lists) */
@@ -129,13 +130,19 @@ export const EXAMPLE_SCRIPTS: [string, string][] = [
   ['contour-map.sh', CONTOUR],
 ]
 
-/** First start: an "examples" folder with the three sample scripts. */
+/** First start: an "examples" folder with the three sample scripts and the GMT tutorial figures. */
 async function seedExamples(tx: Transaction) {
   const now = Date.now()
   const folder = (await tx.table('nodes').add({ parentId: 0, name: EXAMPLE_FOLDER, kind: 'folder', size: 0, createdAt: now, updatedAt: now })) as number
   for (const [name, text] of EXAMPLE_SCRIPTS) {
     const data = toBuffer(text)
     const id = (await tx.table('nodes').add({ parentId: folder, name, kind: 'file', size: data.byteLength, createdAt: now, updatedAt: now })) as number
+    await tx.table('blobs').put({ id, data })
+  }
+  const tut = (await tx.table('nodes').add({ parentId: folder, name: 'gmt-tutorial', kind: 'folder', size: 0, createdAt: now, updatedAt: now })) as number
+  for (const [name, text] of TUTORIAL_SCRIPTS) {
+    const data = toBuffer(text)
+    const id = (await tx.table('nodes').add({ parentId: tut, name, kind: 'file', size: data.byteLength, createdAt: now, updatedAt: now })) as number
     await tx.table('blobs').put({ id, data })
   }
 }
