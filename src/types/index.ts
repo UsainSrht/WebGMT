@@ -1,3 +1,4 @@
+/** Legacy (v1 database) record, migrated into NodeRecord on upgrade */
 export interface ScriptRecord {
   id?: number
   title: string
@@ -7,6 +8,7 @@ export interface ScriptRecord {
   tags: string[]
 }
 
+/** Legacy (v1 database) record, migrated into NodeRecord on upgrade */
 export interface FileRecord {
   id?: number
   name: string
@@ -14,6 +16,22 @@ export interface FileRecord {
   size: number
   data: ArrayBuffer
   updatedAt: number
+}
+
+/** One entry of the project tree. parentId 0 is the project root. File contents live in the blobs table. */
+export interface NodeRecord {
+  id?: number
+  parentId: number
+  name: string
+  kind: 'file' | 'folder'
+  size: number
+  createdAt: number
+  updatedAt: number
+}
+
+export interface BlobRecord {
+  id: number
+  data: ArrayBuffer
 }
 
 export interface HistoryRecord {
@@ -32,11 +50,19 @@ export interface LogEntry {
 }
 
 export interface WorkerFile {
+  /** path relative to the project root */
   name: string
   data: ArrayBuffer
 }
 
-export type WorkerRequest = { type: 'run'; id: number; script: string; files: WorkerFile[] }
+export type WorkerRequest = {
+  type: 'run'
+  id: number
+  script: string
+  /** folder of the script (relative to the project root): the working directory of the run */
+  cwd: string
+  files: WorkerFile[]
+}
 
 export type WorkerResponse =
   | { type: 'log'; id: number; entry: LogEntry }

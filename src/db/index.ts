@@ -1,10 +1,15 @@
-import Dexie, { type EntityTable } from 'dexie'
-import type { FileRecord, HistoryRecord, ScriptRecord } from '../types'
+import Dexie, { type EntityTable, type Transaction } from 'dexie'
+import type { BlobRecord, FileRecord, HistoryRecord, NodeRecord, ScriptRecord } from '../types'
+import { uniqueName } from '../lib/paths'
 
 class WebGmtDB extends Dexie {
+  /** v1 tables, only read by the v2 upgrade (scripts and data files used to be separate lists) */
   scripts!: EntityTable<ScriptRecord, 'id'>
   files!: EntityTable<FileRecord, 'id'>
   history!: EntityTable<HistoryRecord, 'id'>
+  /** v2: one project tree of files and folders. Contents are kept apart so listing the tree never loads them. */
+  nodes!: EntityTable<NodeRecord, 'id'>
+  blobs!: EntityTable<BlobRecord, 'id'>
 
   constructor() {
     super('webgmt')
@@ -13,10 +18,36 @@ class WebGmtDB extends Dexie {
       files: '++id, &name, updatedAt',
       history: '++id, scriptId, executedAt',
     })
+    this.version(2)
+      .stores({
+        nodes: '++id, parentId, &[parentId+name]',
+        blobs: 'id',
+      })
+      .upgrade(migrateV1)
+    this.on('populate', (tx) => { void seedExamples(tx) })
   }
 }
 
 export const db = new WebGmtDB()
+
+const enc = new TextEncoder()
+const toBuffer = (s: string) => enc.encode(s).buffer as ArrayBuffer
+
+/** v1 -> v2: every script becomes "<title>.sh" and every data file keeps its name, all in the project root. */
+async function migrateV1(tx: Transaction) {
+  const taken = new Set<string>()
+  const add = async (name: string, data: ArrayBuffer, createdAt: number, updatedAt: number) => {
+    const safe = name.replace(/[\\/\0]/g, '-').trim() || 'untitled'
+    const unique = uniqueName(taken, safe)
+    taken.add(unique)
+    const id = (await tx.table('nodes').add({ parentId: 0, name: unique, kind: 'file', size: data.byteLength, createdAt, updatedAt })) as number
+    await tx.table('blobs').put({ id, data })
+  }
+  for (const f of (await tx.table('files').toArray()) as FileRecord[]) await add(f.name, f.data, f.updatedAt, f.updatedAt)
+  for (const s of (await tx.table('scripts').toArray()) as ScriptRecord[]) {
+    await add(/\.[A-Za-z0-9]+$/.test(s.title) ? s.title : `${s.title}.sh`, toBuffer(s.content), s.createdAt, s.updatedAt)
+  }
+}
 
 const WORLD = `#!/bin/bash
 # World map: coastlines, land/ocean fill and a graticule
@@ -91,12 +122,20 @@ gmt begin contours png
 gmt end
 `
 
-export const DEFAULT_SCRIPTS: Omit<ScriptRecord, 'id'>[] = [
-  { title: 'World map', content: WORLD, tags: ['coast', 'basemap'] },
-  { title: 'Earthquakes scatter', content: QUAKES, tags: ['plot', 'cpt'] },
-  { title: 'Contour map', content: CONTOUR, tags: ['contour'] },
-].map((s) => ({ ...s, createdAt: Date.now(), updatedAt: Date.now() }))
+export const EXAMPLE_FOLDER = 'examples'
+export const EXAMPLE_SCRIPTS: [string, string][] = [
+  ['world-map.sh', WORLD],
+  ['earthquakes.sh', QUAKES],
+  ['contour-map.sh', CONTOUR],
+]
 
-export async function seedIfEmpty() {
-  if ((await db.scripts.count()) === 0) await db.scripts.bulkAdd(DEFAULT_SCRIPTS)
+/** First start: an "examples" folder with the three sample scripts. */
+async function seedExamples(tx: Transaction) {
+  const now = Date.now()
+  const folder = (await tx.table('nodes').add({ parentId: 0, name: EXAMPLE_FOLDER, kind: 'folder', size: 0, createdAt: now, updatedAt: now })) as number
+  for (const [name, text] of EXAMPLE_SCRIPTS) {
+    const data = toBuffer(text)
+    const id = (await tx.table('nodes').add({ parentId: folder, name, kind: 'file', size: data.byteLength, createdAt: now, updatedAt: now })) as number
+    await tx.table('blobs').put({ id, data })
+  }
 }

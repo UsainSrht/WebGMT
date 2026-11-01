@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import { runShell, type ShellRuntime, type Vfs } from '../lib/shell'
+import { dirname, normalize, relative, resolveFrom } from '../lib/paths'
 import { createMock } from './mockEngine'
 import { coastFilesFor, loadDataFile } from '../services/dataCacheService'
 import type { LogEntry, WorkerRequest, WorkerResponse } from '../types'
@@ -100,12 +101,14 @@ function readRawFigures(): ArrayBuffer[] {
   return names.map((n) => (FS.readFile(`${SESSION_DIR}/${n}`) as Uint8Array).slice().buffer)
 }
 
-function cleanWorkspace(keep: Set<string>) {
+/** Empties the workspace (the project files are written fresh for every run). */
+function cleanWorkspace() {
   const FS = wasm.FS
   try { rmTree(SESSION_DIR) } catch { /* nothing to clean */ }
   for (const name of FS.readdir(WORKSPACE) as string[]) {
-    if (name === '.' || name === '..' || keep.has(name)) continue
-    try { FS.unlink(`${WORKSPACE}/${name}`) } catch { /* directory or busy */ }
+    if (name === '.' || name === '..') continue
+    const p = `${WORKSPACE}/${name}`
+    try { if (FS.isDir(FS.stat(p).mode)) rmTree(p); else FS.unlink(p) } catch { /* busy */ }
   }
 }
 
@@ -125,16 +128,18 @@ async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
 
   // ------------------------------------------------------------------ mock engine
   if (!engine) {
+    // keys are paths as seen from the script's folder ("data.dat", "../shared/x.dat")
     const files = new Map<string, Uint8Array>()
-    for (const f of req.files) files.set(f.name, new Uint8Array(f.data))
+    for (const f of req.files) files.set(relative(req.cwd, f.name), new Uint8Array(f.data))
+    const key = (n: string) => relative('', resolveFrom('', n))
     log({ stream: 'info', text: 'Engine: built-in mock (no gmt.wasm found in /gmt/)' })
     const mock = createMock(files, (stream, text, line) => { if (stream === 'stderr') ok = false; log({ stream, text, line }) })
     let figN = 0
     const rt: ShellRuntime = {
       vfs: {
-        read: (n) => files.get(n),
-        write: (n, d, append) => { const o = files.get(n); files.set(n, append && o ? new Uint8Array([...o, ...d]) : d) },
-        remove: (n) => { files.delete(n) },
+        read: (n) => files.get(key(n)),
+        write: (n, d, append) => { const k = key(n); const o = files.get(k); files.set(k, append && o ? new Uint8Array([...o, ...d]) : d) },
+        remove: (n) => { files.delete(key(n)) },
       },
       log: (stream, text, line) => { if (stream === 'stderr' && !text.startsWith('[WARNING]')) ok = false; log({ stream, text, line }) },
       async gmt(module, args, stdin, line) {
@@ -153,18 +158,28 @@ async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
 
   // ------------------------------------------------------------------ real GMT Wasm
   const FS = engine.FS
-  cleanWorkspace(new Set(req.files.map((f) => f.name)))
-  for (const f of req.files) FS.writeFile(`${WORKSPACE}/${f.name}`, new Uint8Array(f.data))
+  cleanWorkspace()
+  for (const f of req.files) {
+    const p = `${WORKSPACE}/${normalize(f.name)}`
+    const dir = dirname(p)
+    if (dir !== WORKSPACE) { try { FS.mkdirTree(dir) } catch { /* exists */ } }
+    FS.writeFile(p, new Uint8Array(f.data))
+  }
+  // the script runs as if started from its own folder
+  const cwdPath = `${WORKSPACE}${req.cwd ? '/' + normalize(req.cwd) : ''}`
+  try { FS.mkdirTree(cwdPath) } catch { /* exists */ }
+  FS.chdir(cwdPath)
+  const at = (n: string) => `${WORKSPACE}/${resolveFrom(req.cwd, n)}`
   let figName = 'figure'
 
   const vfs: Vfs = {
-    read: (n) => { const p = `${WORKSPACE}/${n}`; return FS.analyzePath(p).exists ? (FS.readFile(p) as Uint8Array) : undefined },
+    read: (n) => { const p = at(n); return FS.analyzePath(p).exists ? (FS.readFile(p) as Uint8Array) : undefined },
     write: (n, d, append) => {
-      const p = `${WORKSPACE}/${n}`
-      const slash = p.lastIndexOf('/'); if (slash > WORKSPACE.length) { try { FS.mkdirTree(p.slice(0, slash)) } catch { /* exists */ } }
+      const p = at(n)
+      { try { FS.mkdirTree(dirname(p)) } catch { /* exists */ } }
       if (append && FS.analyzePath(p).exists) { const o = FS.readFile(p) as Uint8Array; FS.writeFile(p, new Uint8Array([...o, ...d])) } else FS.writeFile(p, d)
     },
-    remove: (n) => { try { FS.unlink(`${WORKSPACE}/${n}`) } catch { /* not there */ } },
+    remove: (n) => { try { FS.unlink(at(n)) } catch { /* not there */ } },
   }
 
   const rt: ShellRuntime = {
@@ -241,8 +256,8 @@ async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
 
   if (figures.length === 0) {
     // classic mode (no begin/end): look for PostScript files the script wrote
-    for (const n of (FS.readdir(WORKSPACE) as string[]).filter((n: string) => n.endsWith('.ps')).sort()) {
-      figures.push({ name: n, ps: (FS.readFile(`${WORKSPACE}/${n}`) as Uint8Array).slice().buffer })
+    for (const n of (FS.readdir(cwdPath) as string[]).filter((n: string) => n.endsWith('.ps')).sort()) {
+      figures.push({ name: n, ps: (FS.readFile(`${cwdPath}/${n}`) as Uint8Array).slice().buffer })
     }
   }
   if (figures.length === 0 && ok) log({ stream: 'stderr', text: '[WARNING]: no PostScript output was produced' })

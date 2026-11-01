@@ -52,11 +52,12 @@ function renderPs(ps: ArrayBuffer) {
   })
 }
 
-export function runScript(script: string, files: WorkerFile[], onLog: (e: LogEntry) => void): Promise<RenderResult> {
+/** cwd: the script's folder (project-relative); files: the whole project, named by project path. */
+export function runScript(script: string, cwd: string, files: WorkerFile[], onLog: (e: LogEntry) => void): Promise<RenderResult> {
   getWorkers()
   const id = nextId++
   return new Promise((resolve) => {
     pendingRuns.set(id, { onLog, resolve })
-    gmtWorker!.postMessage({ type: 'run', id, script, files: files.map((f) => ({ name: f.name, data: f.data.slice(0) })) })
+    gmtWorker!.postMessage({ type: 'run', id, script, cwd, files: files.map((f) => ({ name: f.name, data: f.data.slice(0) })) })
   })
 }

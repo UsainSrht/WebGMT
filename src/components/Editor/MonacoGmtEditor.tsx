@@ -10,7 +10,15 @@ import type { EditorMarker } from '../../types'
 ;(self as any).MonacoEnvironment = { getWorker: () => new editorWorker() }
 loader.config({ monaco })
 
+/** Frees the model of a closed tab (the editor keeps one model per path). */
+export function disposeModel(path: string) {
+  monaco.editor.getModel(monaco.Uri.parse(path))?.dispose()
+}
+
 interface Props {
+  /** one Monaco model per path keeps undo history and view state per tab */
+  path: string
+  language: string
   value: string
   onChange: (v: string) => void
   onRun: () => void
@@ -19,7 +27,7 @@ interface Props {
   insertRequest?: { text: string; nonce: number } | null
 }
 
-export function MonacoGmtEditor({ value, onChange, onRun, markers, dark, insertRequest }: Props) {
+export function MonacoGmtEditor({ path, language, value, onChange, onRun, markers, dark, insertRequest }: Props) {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const runRef = useRef(onRun)
   runRef.current = onRun
@@ -32,7 +40,7 @@ export function MonacoGmtEditor({ value, onChange, onRun, markers, dark, insertR
   useEffect(() => {
     const model = editorRef.current?.getModel()
     if (model) applyMarkers(monaco, model, markers)
-  }, [markers])
+  }, [markers, path])
 
   useEffect(() => {
     const ed = editorRef.current
@@ -45,7 +53,8 @@ export function MonacoGmtEditor({ value, onChange, onRun, markers, dark, insertR
   return (
     <Editor
       height="100%"
-      language="gmt"
+      path={path}
+      language={language}
       theme={dark ? 'gmt-dark' : 'gmt-light'}
       value={value}
       beforeMount={(m) => registerGmtLanguage(m)}

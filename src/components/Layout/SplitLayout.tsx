@@ -32,7 +32,7 @@ export function SplitLayout({ sidebar, editor, console: consoleNode, viewer, con
   const [consoleH, consoleHandlers] = useDrag(180, 80, 500, 'y', true)
   return (
     <div className="flex min-h-0 flex-1">
-      <aside style={{ width: sideW }} className="shrink-0 overflow-y-auto bg-slate-100 p-2 dark:bg-slate-900">{sidebar}</aside>
+      <aside style={{ width: sideW }} className="shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-900">{sidebar}</aside>
       <div {...sideH} className="w-1 shrink-0 cursor-col-resize bg-slate-200 hover:bg-blue-400 dark:bg-slate-700" />
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="min-h-0 flex-1">{editor}</div>

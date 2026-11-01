@@ -39,7 +39,10 @@ Needs Docker with ~8 GB RAM available to the VM; every parallel build step is ca
 ## Features
 
 - Monaco with a `gmt` language (highlighting, module/flag completion, heredocs, `$VAR`), diagnostics from stderr via `errorParser.ts`
-- Script library + uploaded datasets in IndexedDB (`scripts`, `files`, `history`); uploaded files are available to scripts by name
+- **File explorer** (left panel): one project tree for scripts and data, stored in IndexedDB (`nodes` + `blobs` tables; `history` kept). Create files and folders, rename (F2 or context menu), delete (Del), and move items by drag and drop (a floating chip follows the cursor, the target folder is highlighted, folders auto-open when hovered). Files and whole folders can be dropped from the desktop onto any folder, or added with the "Drop files or click to upload" box, which stays at the bottom of the tree. Databases from versions before 1.0.0 are migrated automatically (scripts become `<title>.sh`, data files keep their names).
+- **Editor tabs** like VS Code (dirty dot, middle-click to close, tabs restored on reload). Any text file opens in the editor: `.sh`/`.bash`/`.zsh`/`.ksh` (or an extensionless file with a shell shebang) are GMT scripts with GMT highlighting; `.dat`, `.txt`, `.csv` and other text files are plain text (`.json`, `.md`, `.xml` and friends get their own highlighting). Images (png, jpg, gif, webp, svg, bmp, ico, avif) open as a preview, binary files (netCDF grids etc.) open with a "binary file, contents not readable" notice and their size. Split editor is planned, not implemented.
+- **Running**: Run executes the script in the active tab (only for scripts). It runs as if started from its own folder, so `gmt plot data/pts.dat` and `../shared/x.dat` resolve like they would in a terminal, and unsaved edits in other open tabs are used. Files a script writes (`cat > x.csv`) exist only during the run.
+- **Version and credits**: the version lives in `package.json` (`1.0.0`), is injected at build time as `__APP_VERSION__` (`src/lib/version.ts`) and shown in the panel footer together with links to the GMT repository and this repository, the author, and the license dialog.
 - **Scripts run as shell scripts** (`src/lib/shell.ts`), not just lists of `gmt` commands: variables, quotes, `$(...)` and backticks, pipes (`echo "x y t" | gmt text`, `awk ... | gmt plot`), redirects, heredocs, `for ... in ...; do ... done` (nestable), `;`/`&&`/`||`, and bash-like error behaviour (a failing `gmt` command is reported and the script carries on).
 - Built-in commands: `gmt`, `echo`, `printf`, `cat`, `awk` (own implementation: patterns, fields, `printf`, loops, arrays, `-F`/`-v`), `grep`, `date`, `seq`, `qrencode` (writes an EPS QR code that `gmt image` can place), `rm`, `mkdir`, `cd`. `ip a` returns nothing (no network interfaces in a browser). Not supported: `if`/`while`/functions/`$(( ))` (reported, not run).
 - **Several figures per script**: every `gmt begin ... gmt end` block becomes a figure; pick one in the viewer's dropdown.
@@ -53,7 +56,11 @@ Needs Docker with ~8 GB RAM available to the VM; every parallel build step is ca
 
 ## Tests
 
-`npm test` runs `tests/awk.test.ts` (our awk against the system awk, 16 programs) and `tests/shell.test.ts` (pipes, heredocs, substitution, loops, error behaviour). The Wasm engine and renderer have no automated tests; they were checked by running scripts in headless Chrome and comparing the output with real GMT results.
+`npm test` runs `tests/awk.test.ts` (our awk against the system awk, 16 programs), `tests/shell.test.ts` (pipes, heredocs, substitution, loops, error behaviour) and `tests/files.test.ts` (path helpers, text/image/binary detection). The Wasm engine, renderer and explorer UI have no automated tests in the repository; they were checked by driving headless Chrome and comparing the output with real GMT results.
+
+## License
+
+WebGMT is MIT licensed (see [LICENSE](LICENSE)), made by [UsainSrht](https://github.com/UsainSrht). It bundles GMT (LGPL-3.0-or-later) and other third-party code and data; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). WebGMT is not affiliated with the GMT project.
 
 ## Not implemented
 
