@@ -1,0 +1,37 @@
+{
+  "name": "webgmt",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "verify:dist": "node scripts/verify-dist.mjs",
+    "test": "node scripts/test.mjs"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "clsx": "^2.1.1",
+    "dexie": "^4.0.10",
+    "dexie-react-hooks": "^1.1.7",
+    "fflate": "^0.8.2",
+    "lucide-react": "^0.468.0",
+    "monaco-editor": "^0.52.2",
+    "qrcode-generator": "^1.4.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.5.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.6.3",
+    "vite": "^6.0.3"
+  }
+}

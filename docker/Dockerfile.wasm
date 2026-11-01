@@ -1,0 +1,95 @@
+# GMT 6.6.0 -> WebAssembly. Verified: produces gmt.js/gmt.wasm that run the example scripts in the browser.
+# Read docs/COMPILING-GMT-TO-WASM.md before changing anything: most lines here exist because of a specific failure.
+FROM emscripten/emsdk:6.0.13
+
+ENV PREFIX=/libs
+RUN mkdir -p $PREFIX /src && apt-get update && apt-get install -y --no-install-recommends \
+    cmake ninja-build xz-utils curl ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+
+# zlib
+RUN curl -fsSL https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz | tar xz && cd zlib-1.3.1 \
+ && emcmake cmake -B build -DCMAKE_INSTALL_PREFIX=$PREFIX -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j4 && cmake --install build
+
+# pcre2
+RUN curl -fsSL https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.42/pcre2-10.42.tar.gz | tar xz && cd pcre2-10.42 \
+ && emcmake cmake -B build -DCMAKE_INSTALL_PREFIX=$PREFIX -DBUILD_SHARED_LIBS=OFF -DPCRE2_BUILD_TESTS=OFF -DPCRE2_BUILD_PCRE2GREP=OFF -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j4 && cmake --install build
+
+# HDF5 (needed by netcdf-4 and the GSHHG .nc files)
+RUN curl -fsSL https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5_1.14.6.tar.gz | tar xz && cd hdf5-hdf5_1.14.6 \
+ && emcmake cmake -B build -DCMAKE_INSTALL_PREFIX=$PREFIX -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF \
+      -DHDF5_BUILD_TOOLS=OFF -DHDF5_BUILD_EXAMPLES=OFF -DHDF5_BUILD_CPP_LIB=OFF -DHDF5_ENABLE_Z_LIB_SUPPORT=ON \
+      -DZLIB_LIBRARY=$PREFIX/lib/libz.a -DZLIB_INCLUDE_DIR=$PREFIX/include -DHDF5_ENABLE_SZIP_SUPPORT=OFF "-DCMAKE_C_FLAGS=-DFE_INVALID=0" -DCMAKE_FIND_ROOT_PATH=$PREFIX -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j4 && cmake --install build
+
+# netcdf-c
+RUN curl -fsSL https://github.com/Unidata/netcdf-c/archive/refs/tags/v4.9.2.tar.gz | tar xz && cd netcdf-c-4.9.2 \
+ && emcmake cmake -B build -DCMAKE_INSTALL_PREFIX=$PREFIX -DBUILD_SHARED_LIBS=OFF -DENABLE_DAP=OFF -DENABLE_BYTERANGE=OFF \
+      -DBUILD_UTILITIES=OFF -DENABLE_TESTS=OFF -DENABLE_NETCDF_4=ON -DCMAKE_PREFIX_PATH=$PREFIX -DCMAKE_FIND_ROOT_PATH=$PREFIX -DZLIB_LIBRARY=$PREFIX/lib/libz.a -DZLIB_INCLUDE_DIR=$PREFIX/include "-DCMAKE_C_FLAGS=-DHAVE_CONFIG_H=1 -DSIZEOF_CHAR=1 -DSIZEOF_SHORT=2 -DSIZEOF_INT=4 -DSIZEOF_LONG=4 -DSIZEOF_LONG_LONG=8 -DSIZEOF_FLOAT=4 -DSIZEOF_DOUBLE=8 -DSIZEOF_SIZE_T=4 -DSIZEOF_OFF_T=8 -DSIZEOF_VOIDP=4 -DSIZEOF_VOIDSTAR=4 -DSIZEOF_UNSIGNED_INT=4 -DSIZEOF_UNSIGNED_CHAR=1 -DSIZEOF_UNSIGNED_SHORT_INT=2 -DSIZEOF_UNSIGNED_LONG_LONG=8 -DHAVE_SSIZE_T=1 -DSIZEOF_UCHAR=1 -DSIZEOF_USHORT=2 -DSIZEOF_UINT=4 -DSIZEOF_LONGLONG=8 -DSIZEOF_ULONGLONG=8 -DSIZEOF_INT64=8 -DSIZEOF_UINT64=8 -DSIZEOF_INT64_T=8 -DSIZEOF_UINT64_T=8" -DENABLE_PLUGINS=OFF -DENABLE_FILTER_TESTING=OFF -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j4 && cmake --install build
+
+# fftw3
+RUN curl -fsSL https://www.fftw.org/fftw-3.3.10.tar.gz | tar xz && cd fftw-3.3.10 \
+ && emcmake cmake -B build -DCMAKE_INSTALL_PREFIX=$PREFIX -DBUILD_SHARED_LIBS=OFF -DENABLE_THREADS=OFF -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j4 && cmake --install build
+
+# sqlite3 (needed by PROJ); host sqlite3 binary builds proj.db
+RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://www.sqlite.org/2024/sqlite-autoconf-3460000.tar.gz | tar xz && cd sqlite-autoconf-3460000 \
+ && emcc -O2 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_THREADSAFE=0 -c sqlite3.c -o sqlite3.o && emar rcs $PREFIX/lib/libsqlite3.a sqlite3.o \
+ && cp sqlite3.h sqlite3ext.h $PREFIX/include/
+
+# PROJ (GDAL dependency)
+RUN curl -fsSL https://github.com/OSGeo/PROJ/releases/download/9.4.1/proj-9.4.1.tar.gz | tar xz && cd proj-9.4.1 \
+ && emcmake cmake -B build -DCMAKE_INSTALL_PREFIX=$PREFIX -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DBUILD_APPS=OFF \
+      -DENABLE_TIFF=OFF -DENABLE_CURL=OFF -DCMAKE_FIND_ROOT_PATH=$PREFIX \
+      -DSQLITE3_INCLUDE_DIR=$PREFIX/include -DSQLITE3_LIBRARY=$PREFIX/lib/libsqlite3.a -DEXE_SQLITE3=/usr/bin/sqlite3 \
+      -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j4 && cmake --install build
+
+# GDAL, minimal: GMT 6.6 requires it unconditionally, but no optional drivers are needed
+RUN curl -fsSL https://github.com/OSGeo/gdal/releases/download/v3.9.3/gdal-3.9.3.tar.gz | tar xz && cd gdal-3.9.3 \
+ && emcmake cmake -B build -DCMAKE_INSTALL_PREFIX=$PREFIX -DBUILD_SHARED_LIBS=OFF -DBUILD_APPS=OFF -DBUILD_TESTING=OFF \
+      -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_JAVA_BINDINGS=OFF -DBUILD_CSHARP_BINDINGS=OFF \
+      -DGDAL_BUILD_OPTIONAL_DRIVERS=OFF -DOGR_BUILD_OPTIONAL_DRIVERS=OFF -DGDAL_USE_EXTERNAL_LIBS=OFF \
+      -DCMAKE_PREFIX_PATH=$PREFIX -DCMAKE_FIND_ROOT_PATH=$PREFIX \
+      -DPROJ_INCLUDE_DIR=$PREFIX/include -DPROJ_LIBRARY=$PREFIX/lib/libproj.a \
+      -DSQLITE3_INCLUDE_DIR=$PREFIX/include -DSQLITE3_LIBRARY=$PREFIX/lib/libsqlite3.a \
+      -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j4 && cmake --install build
+
+# libcurl (GMT 6.6 requires it to compile; no network/TLS in the browser build)
+RUN curl -fsSL https://github.com/curl/curl/releases/download/curl-8_10_1/curl-8.10.1.tar.gz | tar xz && cd curl-8.10.1 \
+ && emcmake cmake -B build -DCMAKE_INSTALL_PREFIX=$PREFIX -DBUILD_SHARED_LIBS=OFF -DBUILD_CURL_EXE=OFF -DBUILD_TESTING=OFF \
+      -DCURL_ENABLE_SSL=OFF -DCURL_USE_LIBPSL=OFF -DUSE_LIBIDN2=OFF -DCURL_ZLIB=OFF -DCURL_BROTLI=OFF -DCURL_ZSTD=OFF \
+      -DCURL_DISABLE_LDAP=ON -DCURL_USE_LIBSSH2=OFF -DHTTP_ONLY=ON -DENABLE_THREADED_RESOLVER=OFF -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build build -j4 && cmake --install build
+
+# GMT 6.6.0 (static libs only; the `gmt` executable is replaced by gmt_wasm_wrapper.c)
+RUN curl -fsSL https://github.com/GenericMappingTools/gmt/releases/download/6.6.0/gmt-6.6.0-src.tar.xz | tar xJ && cd gmt-6.6.0 \
+ && sed -i 's|^include (FindUnixCommands)|set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules/")\ninclude (FindUnixCommands)|' CMakeLists.txt \
+ && mkdir build && cd build \
+ && emcmake cmake .. \
+      -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGMT_BUILD_STANDALONE=ON -DGMT_USE_OPTIONAL_LIBS=OFF \
+      -DENABLE_OPENMP=OFF -DBUILD_SUPPLEMENTS=OFF -DGMT_INSTALL_MODULE_LINKS=OFF "-DCMAKE_C_FLAGS=-DNO_SIGHANDLER -DSIZEOF_OFF_T=8 -DSIZEOF_INT=4 -DSIZEOF_LONG=4 -DSIZEOF_LONG_LONG=8 -DSIZEOF_SIZE_T=4 -DSIZEOF_VOID_P=4 -DSIZEOF_MODE_T=4 -DSIZEOF_WCHAR_T=4" \
+      "-DNETCDF_LIBRARY=$PREFIX/lib/libnetcdf.a;$PREFIX/lib/libhdf5_hl.a;$PREFIX/lib/libhdf5.a;$PREFIX/lib/libz.a" -DNETCDF_INCLUDE_DIR=$PREFIX/include \
+      -DPCRE2_LIBRARY=$PREFIX/lib/libpcre2-8.a -DPCRE2_INCLUDE_DIR=$PREFIX/include \
+      -DFFTW3F_LIBRARY=$PREFIX/lib/libfftw3f.a -DFFTW3_INCLUDE_DIR=$PREFIX/include \
+      -DCURL_LIBRARY=$PREFIX/lib/libcurl.a -DCURL_INCLUDE_DIR=$PREFIX/include \
+      -DGDAL_LIBRARY=$PREFIX/lib/libgdal.a -DGDAL_INCLUDE_DIR=$PREFIX/include \
+      -DCMAKE_INSTALL_PREFIX=/gmt-install -DCMAKE_FIND_ROOT_PATH=$PREFIX \
+ && (cmake --build . -j4 -- -k || true) \
+ && test -f src/libgmt.a && test -f src/libpostscriptlight.a \
+ && mkdir -p /gmt-install/lib /gmt-install/include/gmt \
+ && cp src/libgmt.a src/libpostscriptlight.a /gmt-install/lib/ \
+ && cp ../src/*.h src/*.h /gmt-install/include/gmt/ \
+ && cmake -DCMAKE_INSTALL_PREFIX=/gmt-install -DCMAKE_INSTALL_COMPONENT=Runtime -P share/cmake_install.cmake
+# NOTE: the standalone `gmt` executable does not link against the static GDAL (PIC mismatch) and is not needed:
+# build_wasm.sh links libgmt.a with gmt_wasm_wrapper.c instead.
+
+COPY gmt_wasm_wrapper.c build_wasm.sh /src/
+RUN chmod +x /src/build_wasm.sh && /src/build_wasm.sh
+
+# Artifacts end up in /out (gmt.js, gmt.wasm, gmt.data share files)

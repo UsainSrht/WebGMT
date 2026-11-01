@@ -1,0 +1,17 @@
+name: build-wasm
+on:
+  workflow_dispatch:
+jobs:
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f docker/Dockerfile.wasm -t webgmt-wasm docker
+      - run: |
+          id=$(docker create webgmt-wasm)
+          docker cp "$id":/out ./wasm-out
+          docker rm "$id"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gmt-wasm
+          path: wasm-out/
