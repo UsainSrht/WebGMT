@@ -236,6 +236,7 @@ async function runScript(req: Extract<WorkerRequest, { type: 'run' }>) {
       if (remote) {
         args = remote.args
         for (const n of remote.notes) log({ stream: 'info', text: `[NOTE]: ${n}`, line })
+        for (const h of remote.hints) log({ stream: 'info', text: `[HINT]: ${h}`, line })
         for (const f of remote.files) {
           if (mounted.has(REMOTE_DIR + '/' + f.file)) continue
           const data = await loadDataFile(f.file, 'remote')

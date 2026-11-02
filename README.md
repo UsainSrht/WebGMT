@@ -32,6 +32,14 @@ Known limits of the Wasm build:
 
 `@name` arguments are rewritten (`src/services/remoteData.ts`) to bundled copies in `public/gmt/remote/`, fetched on demand and cached: the tutorial files (`@tut_data.txt`, `@tut_quakes.ngdc`, `@tut_ship.xyz`, `@tut_bathy.nc`, `@tut_relief.nc`, `@otemp.anal1deg.nc`) and the global `@earth_relief_01d`, `30m`, `10m` and `05m` grids (SRTM15+ v2.7, pixel registered; the 05m file was converted from the server's JPEG 2000 tiles with GDAL). The 30 arc-second tutorial region (-108/-103/35/40) is bundled as a subset. Any other `@earth_relief_*` resolution falls back to the 10m grid with a note in the console. About 33 MB of data in total; none of it is loaded until a script uses it.
 
+**Data WebGMT does not have.** GMT's data server cannot be used from a browser (it sends no CORS headers), and the finer datasets are JPEG 2000 tiles of many GB. When a script asks for one, the console prints `[HINT]` lines that say what to do, with the script's own `-R` filled in:
+
+- a server dataset in one file (`@earth_relief_06m`, `@earth_geoid_10m`, ...): download the `.grd` from the link in the hint, drag it into the file explorer next to the script, and use its file name instead of `@name`;
+- a tiled dataset (`@earth_relief_01m`, `@earth_relief_30s` outside the tutorial region, ...): on a computer with GMT run `gmt grdcut @earth_relief_01m -R... -Gregion.nc`, drag `region.nc` into the file explorer and use it instead of `@name`;
+- a file of the server's cache (`@topo.8.4.img`, `@earth_age.cpt`, ...): download it from `https://oceania.generic-mapping-tools.org/cache/`, add it to the project and drop the `@`.
+
+Where a coarser bundled grid can stand in (`@earth_relief_*`), the script still runs on it, with a `[NOTE]` saying so. The list of cache files is in `src/services/serverCacheFiles.ts`.
+
 ## Rebuilding the Wasm engine
 
 ```bash

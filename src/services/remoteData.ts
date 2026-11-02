@@ -1,6 +1,7 @@
 // GMT's "@name" remote files (tutorial data, @earth_relief_*) normally come from the GMT data server. A browser
 // cannot download them (the server sends no CORS headers), so WebGMT ships the ones it can under /gmt/remote/ and
 // rewrites "@name" arguments to the bundled copy. Pure logic: the worker does the fetching and mounting.
+import { SERVER_CACHE_FILES } from './serverCacheFiles'
 
 /** Where the bundled copies appear in the Wasm file system. */
 export const REMOTE_DIR = '/gmt-remote'
@@ -14,6 +15,8 @@ export interface RemoteResolution {
   args: string[]
   files: RemoteFile[]
   notes: string[]
+  /** how to get data WebGMT does not have (download link, how to add it to the project), one line each */
+  hints: string[]
 }
 
 /** Tutorial and example files that are bundled unchanged. */
@@ -41,10 +44,55 @@ export function parseRegion(args: string[]): [number, number, number, number] | 
 
 const NAME = /@([A-Za-z0-9_.]+)/g
 
-/** Rewrites the "@name" arguments of one GMT command to bundled files; returns null when there is nothing to do. */
+const SERVER = 'https://oceania.generic-mapping-tools.org'
+/** Resolutions the server offers as one downloadable .grd file; everything finer is a folder of JPEG 2000 tiles. */
+const SINGLE_FILE_RES = new Set(['01d', '30m', '20m', '15m', '10m', '06m'])
+const DATASET = /^(earth|moon|mars|mercury|venus|pluto)_([a-z0-9]+)_(\d\d[dms])(?:_([gp]))?$/
+
+/** The -R of the command if it is numeric (so the hint can be pasted), else a placeholder. */
+function regionText(args: string[]): string {
+  const r = args.find((a) => a.startsWith('-R'))
+  return r && parseRegion(args) ? r.replace(/\+.*$/, '') : '-R<west>/<east>/<south>/<north>'
+}
+
+const WHY = "WebGMT cannot download it: GMT's data server does not allow requests from web pages, and this dataset is not bundled."
+
+/** How to get a server dataset (@earth_geoid_10m, @earth_relief_01m, ...) into WebGMT by hand. */
+export function datasetHint(name: string, args: string[]): string[] {
+  const m = DATASET.exec(name)
+  if (!m) return []
+  const [, body, what, res, reg] = m
+  const family = `${body}_${what}`
+  if (SINGLE_FILE_RES.has(res)) {
+    const file = `${family}_${res}_${reg ?? 'p'}.grd`
+    return [
+      `@${name}: ${WHY}`,
+      `It is a single file: download ${SERVER}/server/${body}/${family}/${file} , drag it into the file explorer (next to your script) and write ${file} instead of @${name} in the script.`,
+    ]
+  }
+  return [
+    `@${name}: ${WHY}`,
+    `This resolution is a set of very large JPEG 2000 tiles. On a computer with GMT installed, cut just the region you need: gmt grdcut @${name} ${regionText(args)} -Gregion.nc`,
+    `Then drag region.nc into the file explorer (next to your script) and write region.nc instead of @${name} in the script. Several regions: use one file each.`,
+  ]
+}
+
+/** How to get a server cache file (@name.ext) into WebGMT by hand. */
+export function cacheFileHint(name: string): string[] {
+  return [
+    `@${name}: ${WHY}`,
+    `Download ${SERVER}/cache/${name} , drag it into the file explorer (next to your script) and write ${name} (without the @) in the script.`,
+  ]
+}
+
+/** Rewrites the "@name" arguments of one GMT command to bundled files, and explains how to add the data we do not
+ *  have; returns null when there is nothing to do. */
 export function resolveRemote(args: string[]): RemoteResolution | null {
   const files: RemoteFile[] = []
   const notes: string[] = []
+  const hints: string[] = []
+  const hinted = new Set<string>()
+  const hint = (name: string, lines: string[]) => { if (!hinted.has(name)) { hinted.add(name); hints.push(...lines) } }
   const region = parseRegion(args)
   let touched = false
 
@@ -56,7 +104,11 @@ export function resolveRemote(args: string[]): RemoteResolution | null {
       const name = raw.replace(/\.$/, '') // a trailing dot is punctuation ("+u@.")
       if (PLAIN.has(name)) { touched = true; return use(name) + raw.slice(name.length) }
       const m = /^earth_relief_(\d\d[dms])(?:_([gp]))?$/.exec(name)
-      if (!m) return whole
+      if (!m) {
+        if (DATASET.test(name)) hint(name, datasetHint(name, args))
+        else if (SERVER_CACHE_FILES.has(name)) hint(name, cacheFileHint(name)) // a real server file we do not bundle
+        return whole
+      }
       touched = true
       const res = m[1]
       if (GLOBAL[res]) return use(GLOBAL[res])
@@ -67,8 +119,9 @@ export function resolveRemote(args: string[]): RemoteResolution | null {
         (sub ? ` outside ${sub.w}/${sub.e}/${sub.s}/${sub.n}` : '') +
         `; using the bundled ${FALLBACK} global grid instead (coarser than requested)`,
       )
+      hint(name, datasetHint(name, args))
       return use(GLOBAL[FALLBACK])
     })
   })
-  return touched ? { args: out, files, notes } : null
+  return touched || hints.length ? { args: out, files, notes, hints } : null
 }
