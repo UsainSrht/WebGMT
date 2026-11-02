@@ -16,7 +16,9 @@ import { ConsoleOutput } from './components/Terminal/ConsoleOutput'
 import { Header } from './components/Layout/Header'
 import { SidebarFooter } from './components/Layout/SidebarFooter'
 import { AboutModal } from './components/Layout/AboutModal'
-import { SplitLayout } from './components/Layout/SplitLayout'
+import { ResponsiveLayout } from './components/Layout/ResponsiveLayout'
+import type { Pane } from './components/Layout/MobileLayout'
+import { COMPACT_QUERY, useMediaQuery } from './lib/useMediaQuery'
 import type { EditorMarker, LogEntry, RenderResult } from './types'
 
 type Doc =
@@ -59,6 +61,9 @@ export default function App() {
   const [about, setAbout] = useState<'about' | 'license' | null>(null)
   const [insert, setInsert] = useState<{ text: string; nonce: number } | null>(null)
   const restored = useRef(false)
+  // phones and tablets (and narrow windows) get one pane at a time instead of three columns
+  const compact = useMediaQuery(COMPACT_QUERY)
+  const [pane, setPane] = useState<Pane>('editor')
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -206,12 +211,15 @@ export default function App() {
       status = r.ok ? 'ok' : 'error'
       setMarkers({ id: scriptId, list: parseErrors(collected, content.split('\n').length) })
       onLog({ stream: 'info', text: r.ok ? `Done in ${Math.round(ms)} ms` : 'Finished with errors' })
+      // compact layout: show the map when there is one, otherwise the console with what went wrong
+      if (compact) { if (r.ok && r.figures.length) setPane('map'); else { setPane('editor'); setConsoleCollapsed(false) } }
     } catch (e) {
       onLog({ stream: 'stderr', text: `[ERROR]: ${(e as Error).message}` })
+      if (compact) { setPane('editor'); setConsoleCollapsed(false) }
     }
     await db.history.add({ scriptId, executedAt: Date.now(), status, executionTimeMs: ms })
     setRunning(false)
-  }, [running, activeId, activeNode, activeDoc, activeLanguage, docs, byId, save])
+  }, [running, activeId, activeNode, activeDoc, activeLanguage, docs, byId, save, compact])
 
   // ---------------------------------------------------------------- rendering
   const tabInfos: TabInfo[] = tabs.flatMap((id) => {
@@ -226,7 +234,7 @@ export default function App() {
 
   const sidebar = (
     <div className="flex h-full min-h-0 flex-col">
-      <FileExplorer nodes={nodes} activeId={activeId} onOpen={openFile} onDeleted={closeTabs} onInsertPath={onInsertPath} />
+      <FileExplorer nodes={nodes} activeId={activeId} onOpen={(id) => { setPane('editor'); return openFile(id) }} onDeleted={closeTabs} onInsertPath={onInsertPath} />
       <SidebarFooter onAbout={setAbout} />
     </div>
   )
@@ -256,9 +264,13 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" style={compact ? { height: '100dvh' } : undefined}>
       <Header dark={dark} onToggleTheme={() => setDark((d) => !d)} />
-      <SplitLayout
+      <ResponsiveLayout
+        compact={compact}
+        pane={pane}
+        onPane={setPane}
+        running={running}
         consoleCollapsed={consoleCollapsed}
         sidebar={sidebar}
         editor={

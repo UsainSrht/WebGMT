@@ -8,7 +8,7 @@ interface Props {
 }
 
 export function ZoomControls({ scale, onZoomIn, onZoomOut, onFit }: Props) {
-  const b = 'rounded p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700'
+  const b = 'rounded p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 [@media(pointer:coarse)]:p-3'
   return (
     <div className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-lg border border-slate-300 bg-white/90 p-0.5 shadow dark:border-slate-600 dark:bg-slate-800/90">
       <button className={b} onClick={onZoomOut} aria-label="Zoom out"><ZoomOut size={16} /></button>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronDown, ChevronRight, ChevronsDownUp, File as FileIcon, FileCode, FileImage, FilePlus, FileText, FileUp, Folder,
-  FolderOpen, FolderPlus,
+  FolderOpen, FolderPlus, MoreVertical,
 } from 'lucide-react'
 import {
   ROOT, childrenMap, createFile, createFolder, deleteNode, isDescendant, mkdirp, moveNode, pathOf, putFile, readFile, renameNode,
@@ -230,7 +230,7 @@ export function FileExplorer({ nodes, activeId, onOpen, onDeleted, onInsertPath 
         }}
         onBlur={(e) => void commitEdit(e.currentTarget.value)}
         onClick={(e) => e.stopPropagation()}
-        className="min-w-0 flex-1 rounded border border-blue-500 bg-white px-1 py-0 text-sm outline-none dark:bg-slate-950"
+        className="min-w-0 flex-1 rounded border border-blue-500 bg-white px-1 py-0 text-sm outline-none dark:bg-slate-950 [@media(pointer:coarse)]:py-1 [@media(pointer:coarse)]:text-base"
         aria-label={placeholder}
       />
     </div>
@@ -277,7 +277,7 @@ export function FileExplorer({ nodes, activeId, onOpen, onDeleted, onInsertPath 
             onDragLeave={() => { if (dropTarget === n.id) setDropTarget(null); if (isFolder) clearHover() }}
             onDrop={(e) => drop(e, target)}
             style={{ paddingLeft: 6 + depth * 14 }}
-            className={`flex cursor-pointer select-none items-center gap-1 py-[3px] pr-2 text-sm ${
+            className={`flex cursor-pointer select-none items-center gap-1 py-[3px] pr-2 text-sm [@media(pointer:coarse)]:py-2 ${
               isDrop ? 'bg-blue-200/70 ring-1 ring-inset ring-blue-500 dark:bg-blue-900/50'
               : dropTarget === target && !isFolder && dropTarget !== ROOT ? 'bg-blue-100/60 dark:bg-blue-900/20'
               : selected === n.id ? 'bg-blue-100 dark:bg-blue-900/40'
@@ -287,6 +287,15 @@ export function FileExplorer({ nodes, activeId, onOpen, onDeleted, onInsertPath 
             <span className="flex w-3.5 shrink-0 justify-center text-slate-500">{isFolder ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</span>
             {iconFor(n, open)}
             <span className={`min-w-0 flex-1 truncate ${n.id === activeId ? 'font-semibold' : ''}`}>{n.name}</span>
+            {/* touch screens have no right-click: a button opens the same menu */}
+            <button
+              aria-label={`Actions for ${n.name}`}
+              title="Rename, delete, download"
+              className="hidden shrink-0 rounded p-1 text-slate-500 [@media(hover:none)]:block"
+              onClick={(e) => { e.stopPropagation(); setSelected(n.id); const r = e.currentTarget.getBoundingClientRect(); setMenu({ x: r.right - 176, y: r.bottom, id: n.id }) }}
+            >
+              <MoreVertical size={16} />
+            </button>
           </div>,
         )
       }
@@ -296,7 +305,7 @@ export function FileExplorer({ nodes, activeId, onOpen, onDeleted, onInsertPath 
   }
 
   const menuNode = menu && menu.id !== ROOT ? byId.get(menu.id) : undefined
-  const item = 'block w-full px-3 py-1 text-left text-sm hover:bg-blue-600 hover:text-white'
+  const item = 'block w-full px-3 py-1 text-left text-sm hover:bg-blue-600 hover:text-white [@media(pointer:coarse)]:py-2.5 [@media(pointer:coarse)]:text-base'
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

@@ -78,7 +78,7 @@ export function DownloadIndicator() {
       </button>
       {open && (
         <div className="absolute right-0 top-full z-50 pt-1">
-          <div role="dialog" aria-label="Downloads" className="w-80 overflow-hidden rounded-md border border-slate-300 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-800">
+          <div role="dialog" aria-label="Downloads" className="w-80 max-w-[calc(100vw-1rem)] overflow-hidden rounded-md border border-slate-300 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-800">
             <p className="border-b border-slate-200 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-700">Downloads</p>
             <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-700">
               {downloads.map((d) => <Row key={d.id} d={d} />)}

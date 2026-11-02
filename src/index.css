@@ -9,3 +9,9 @@ code { @apply rounded bg-slate-200 px-1 dark:bg-slate-700; }
 /* dark native controls (scrollbars) in dark mode; thin scrollbar on the editor tab strip */
 html.dark { color-scheme: dark; }
 [role='tablist'] { scrollbar-width: thin; }
+
+/* phones and tablets: no pull-to-refresh / rubber-banding on the app, and taps without the double-tap-zoom delay */
+@media (max-width: 1199px), (pointer: coarse) {
+  body { overscroll-behavior: none; }
+  button, [role='tab'], [role='treeitem'], select, input { touch-action: manipulation; }
+}

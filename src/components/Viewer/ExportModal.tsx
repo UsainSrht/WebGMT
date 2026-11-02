@@ -30,7 +30,7 @@ export function ExportModal({ result, script, name, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="w-96 rounded-lg bg-white p-4 shadow-xl dark:bg-slate-800" onClick={(e) => e.stopPropagation()}>
+      <div className="w-96 max-w-[calc(100vw-1rem)] rounded-lg bg-white p-4 shadow-xl dark:bg-slate-800" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold">Export</h2>
           <button onClick={onClose} aria-label="Close"><X size={18} /></button>
