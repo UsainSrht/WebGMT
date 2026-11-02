@@ -4,6 +4,7 @@ import { dirname, normalize, relative, resolveFrom } from '../lib/paths'
 import { createMock } from './mockEngine'
 import { coastFilesFor, loadDataFile } from '../services/dataCacheService'
 import { REMOTE_DIR, resolveRemote } from '../services/remoteData'
+import { DownloadCancelled, cancelDownload, setDownloadSink, sizeOf, trackedFetch, wasCancelled } from './trackedFetch'
 import type { LogEntry, WorkerRequest, WorkerResponse } from '../types'
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope
@@ -15,7 +16,9 @@ const dec = new TextDecoder()
 type Figure = { name: string; ps?: ArrayBuffer; svg?: string }
 
 let wasm: any | null = null
-let wasmChecked = false
+// one load in flight at a time: the warm-up and a first Run share it
+let wasmPromise: Promise<any | null> | null = null
+setDownloadSink((ev) => ctx.postMessage({ type: 'download', ...ev } satisfies WorkerResponse))
 let currentLogger: ((e: LogEntry) => void) | null = null
 let currentLine: number | undefined
 // stdin for the GMT call in flight (set by the shell for `echo ... | gmt plot` and heredocs)
@@ -24,9 +27,14 @@ let stdinPos = 0
 // coastline files already written into the Wasm file system (it lives as long as the module instance)
 const mounted = new Set<string>()
 
-async function loadWasm() {
-  if (wasmChecked) return wasm
-  wasmChecked = true
+/** The engine, or null when none is deployed (then the mock engine is used). Throws DownloadCancelled if the user
+ *  cancelled the download; the next call tries again. */
+function loadWasm(): Promise<any | null> {
+  wasmPromise ??= doLoadWasm().catch((e) => { wasmPromise = null; throw e })
+  return wasmPromise
+}
+
+async function doLoadWasm() {
   try {
     const probe = await fetch('/gmt/gmt.js', { method: 'HEAD' })
     const type = probe.headers.get('content-type') ?? ''
@@ -40,8 +48,22 @@ async function loadWasm() {
       printErr: (t: string) => currentLogger?.({ stream: 'stderr', text: t, line: currentLine }),
       stdin: () => (stdinBuf && stdinPos < stdinBuf.length ? stdinBuf[stdinPos++] : null),
       locateFile: (p: string) => `/gmt/${p}`,
+      // download the wasm ourselves: compiles while it streams in, and the page shows progress / can cancel it
+      instantiateWasm: (imports: WebAssembly.Imports, done: (i: WebAssembly.Instance, m: WebAssembly.Module) => void) => {
+        void (async () => {
+          try {
+            const res = await trackedFetch('engine', 'GMT engine (gmt.wasm)', '/gmt/gmt.wasm', await sizeOf('gmt.wasm'))
+            if (!res) throw new Error('gmt.wasm is not deployed')
+            const r = await WebAssembly.instantiateStreaming(res, imports)
+            done(r.instance, r.module)
+          } catch (e) { failLoad(wasCancelled('engine') ? new DownloadCancelled('GMT engine (gmt.wasm)') : e) }
+        })()
+        return {}
+      },
     }
-    wasm = await mod.default(cfg)
+    let failLoad: (e: unknown) => void = () => {}
+    const failed = new Promise<never>((_, reject) => { failLoad = reject })
+    wasm = await Promise.race([mod.default(cfg), failed])
     const FS = wasm.FS
     for (const d of [WORKSPACE, '/gmt-install/share/coast']) {
       try { FS.mkdirTree(d) } catch { /* exists */ }
@@ -49,6 +71,7 @@ async function loadWasm() {
     FS.chdir(WORKSPACE)
   } catch (e) {
     wasm = null
+    if (e instanceof DownloadCancelled) throw e
     ctx.postMessage({
       type: 'log',
       id: -1,
@@ -113,7 +136,18 @@ function cleanWorkspace() {
   }
 }
 
+/** A cancelled download ends the run with an error instead of falling back to something else. */
 async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
+  try {
+    await runScript(req)
+  } catch (e) {
+    if (!(e instanceof DownloadCancelled)) throw e
+    ctx.postMessage({ type: 'log', id: req.id, entry: { stream: 'stderr', text: `[ERROR]: ${e.message}` } } satisfies WorkerResponse)
+    ctx.postMessage({ type: 'result', id: req.id, ok: false, engine: 'wasm', figures: [], durationMs: 0 } satisfies WorkerResponse)
+  }
+}
+
+async function runScript(req: Extract<WorkerRequest, { type: 'run' }>) {
   const t0 = performance.now()
   const post = (m: WorkerResponse) => {
     const transfer: Transferable[] = []
@@ -248,7 +282,7 @@ async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
 
       if (trapped) {
         // A Wasm trap leaves the module in an undefined state: drop it so the next run starts fresh.
-        wasm = null; wasmChecked = false; mounted.clear()
+        wasm = null; wasmPromise = null; mounted.clear()
         throw new Error('GMT crashed (WebAssembly trap)')
       }
       if (module === 'end') {
@@ -281,5 +315,8 @@ async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
 }
 
 ctx.onmessage = (e: MessageEvent<WorkerRequest>) => {
-  if (e.data.type === 'run') void run(e.data)
+  const m = e.data
+  if (m.type === 'run') void run(m)
+  else if (m.type === 'cancel-download') cancelDownload(m.id)
+  else if (m.type === 'warmup') void loadWasm().catch(() => { /* cancelled: the first Run asks again */ })
 }

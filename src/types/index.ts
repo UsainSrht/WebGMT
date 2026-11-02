@@ -55,17 +55,28 @@ export interface WorkerFile {
   data: ArrayBuffer
 }
 
-export type WorkerRequest = {
-  type: 'run'
-  id: number
-  script: string
-  /** folder of the script (relative to the project root): the working directory of the run */
-  cwd: string
-  files: WorkerFile[]
-}
+export type WorkerRequest =
+  | {
+      type: 'run'
+      id: number
+      script: string
+      /** folder of the script (relative to the project root): the working directory of the run */
+      cwd: string
+      files: WorkerFile[]
+    }
+  /** load the engine in the background so the first Run does not have to wait for it */
+  | { type: 'warmup' }
+  | { type: 'cancel-download'; id: string }
+
+/** Progress of one download, sent by the worker (see lib/downloadState.ts). */
+export type DownloadEvent =
+  | { event: 'start'; id: string; label: string; total: number }
+  | { event: 'progress'; id: string; loaded: number }
+  | { event: 'end'; id: string; status: 'done' | 'error' | 'cancelled'; error?: string }
 
 export type WorkerResponse =
   | { type: 'log'; id: number; entry: LogEntry }
+  | ({ type: 'download' } & DownloadEvent)
   | {
       type: 'result'
       id: number

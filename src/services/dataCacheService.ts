@@ -1,4 +1,6 @@
-/** Fetches GSHHG coastline files on demand from /gmt/data and caches them in CacheStorage. */
+import { DownloadCancelled, sizeOf, trackedFetch, wasCancelled } from '../workers/trackedFetch'
+
+/** Fetches GSHHG coastline files and bundled datasets on demand from /gmt and caches them in CacheStorage. */
 const CACHE_NAME = 'webgmt-gshhg-v1'
 
 export interface CoastFile {
@@ -30,26 +32,22 @@ export function coastFilesFor(args: string[]): { files: CoastFile[]; notes: stri
   return { files, notes }
 }
 
-async function fetchData(url: string): Promise<Response | null> {
-  const res = await fetch(url)
-  const type = res.headers.get('content-type') ?? ''
-  if (!res.ok || type.includes('text/html')) return null // SPA fallback => file not deployed
-  return res
-}
-
 /** dir is the folder under /gmt/ the file is served from: 'data' (coastlines) or 'remote' (tutorial data, earth_relief) */
 export async function loadDataFile(name: string, dir: 'data' | 'remote' = 'data'): Promise<ArrayBuffer | null> {
   const url = `/gmt/${dir}/${name}`
   try {
-    let cache: Cache | null = null
-    try { cache = await caches.open(CACHE_NAME) } catch { /* CacheStorage can be unavailable (private mode, blocked storage) */ }
-    const hit = cache ? await cache.match(url) : undefined
-    if (hit) return await hit.arrayBuffer()
-    const res = await fetchData(url)
-    if (!res) return null
-    if (cache) { try { await cache.put(url, res.clone()) } catch { /* caching is best effort */ } }
-    return await res.arrayBuffer()
-  } catch {
-    return null
+  let cache: Cache | null = null
+  try { cache = await caches.open(CACHE_NAME) } catch { /* CacheStorage can be unavailable (private mode, blocked storage) */ }
+  const hit = cache ? await cache.match(url) : undefined
+  if (hit) return await hit.arrayBuffer() // already downloaded earlier: no progress to show
+  // The page shows this download (size, speed, cancel); a cancelled download rejects with DownloadCancelled.
+  const res = await trackedFetch(url, `${dir === 'data' ? 'Coastline data' : 'Dataset'}: ${name}`, url, await sizeOf(`${dir}/${name}`))
+  if (!res) return null
+  if (cache) { try { await cache.put(url, res.clone()) } catch { /* caching is best effort */ } }
+  return await res.arrayBuffer()
+  } catch (e) {
+    if (e instanceof DownloadCancelled) throw e // the user cancelled: stop the run
+    if (wasCancelled(url)) throw new DownloadCancelled(name)
+    return null // not deployed / network error: reported by the caller
   }
 }

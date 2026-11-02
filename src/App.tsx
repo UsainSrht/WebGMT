@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db'
-import { runScript } from './services/gmtBridge'
+import { runScript, warmup } from './services/gmtBridge'
 import { parseErrors } from './services/errorParser'
 import { pathOf, readFile, snapshotFiles, writeFile, type TreeNode } from './services/fsService'
 import { classify } from './lib/fileTypes'
@@ -64,6 +64,17 @@ export default function App() {
     document.documentElement.classList.toggle('dark', dark)
     try { localStorage.setItem('webgmt-theme', dark ? 'dark' : 'light') } catch { /* ignore */ }
   }, [dark])
+
+  // Load the engine in the background a little after the page is up, so the first Run does not wait for the download.
+  // Skipped when the browser asks to save data.
+  useEffect(() => {
+    if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return
+    const t = window.setTimeout(() => {
+      if ('requestIdleCallback' in window) window.requestIdleCallback(() => warmup(), { timeout: 4000 })
+      else warmup()
+    }, 2000)
+    return () => window.clearTimeout(t)
+  }, [])
 
   // ---------------------------------------------------------------- tabs
   const loadInto = useCallback(async (node: TreeNode) => {
