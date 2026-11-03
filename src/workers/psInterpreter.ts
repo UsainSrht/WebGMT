@@ -396,7 +396,11 @@ export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, valu
       const im = ((d.get('ImageMatrix')?.arr as Obj[] | undefined) ?? [w, 0, 0, -h, 0, h]).map(Number) as Mat
       const toDevice = mul(mul(inv(im), gs.ctm), [1, 0, 0, -1, -bx0, H + by0])
       const png = toBase64(pngEncode(rgb, w, h))
-      out.push(`<image width="${w}" height="${h}" preserveAspectRatio="none" image-rendering="pixelated" transform="matrix(${toDevice.map((v) => +v.toFixed(6)).join(' ')})" href="data:image/png;base64,${png}"/>`)
+      // Hard pixels only when the image is shown at about its own size; scaled up or down it is interpolated, so a
+      // coarse grid (a 1 degree map over 9 inches) does not turn into big squares and a dense one does not alias.
+      const sx = Math.hypot(toDevice[0], toDevice[1]), sy = Math.hypot(toDevice[2], toDevice[3])
+      const native = sx > 0.85 && sx < 1.15 && sy > 0.85 && sy < 1.15
+      out.push(`<image width="${w}" height="${h}" preserveAspectRatio="none"${native ? ' image-rendering="pixelated"' : ''} transform="matrix(${toDevice.map((v) => +v.toFixed(6)).join(' ')})" href="data:image/png;base64,${png}"/>`)
       for (const [cx, cy] of [[0, 0], [w, 0], [0, h], [w, h]]) { const [gx, gy] = apply(toDevice, cx, cy); grow(gx, gy) }
     },
     findfont: () => { const n = ostack.pop(); ostack.push({ font: n.name ?? n.str, size: 1 }) },

@@ -147,6 +147,9 @@ async function run(req: Extract<WorkerRequest, { type: 'run' }>) {
   }
 }
 
+const PAPER_GUESS = /\[WARNING\]: (Changing to PostScript landscape orientation|Use PS_MEDIA and\/or PS_PAGE_ORIENTATION)/
+const REMOTE_PATH = new RegExp(REMOTE_DIR + '/(?:r[-0-9._]+/)?', 'g')
+
 async function runScript(req: Extract<WorkerRequest, { type: 'run' }>) {
   const t0 = performance.now()
   const post = (m: WorkerResponse) => {
@@ -155,7 +158,13 @@ async function runScript(req: Extract<WorkerRequest, { type: 'run' }>) {
     ctx.postMessage(m, transfer)
   }
   // bundled "@name" data lives under /gmt-remote; show the name the user typed
-  const log = (entry: LogEntry) => post({ type: 'log', id: req.id, entry: { ...entry, text: entry.text.split(REMOTE_DIR + '/').join('') } })
+  // (a cut window lives in /gmt-remote/r<region>/: show it under the name the user typed as well)
+  const keepPaperGuess = /PS_MEDIA|PS_PAGE_ORIENTATION/.test(req.script)
+  const log = (entry: LogEntry) => {
+    // GMT guesses the paper orientation of wide figures and says so; WebGMT has no paper, the figure is cropped to its content
+    if (!keepPaperGuess && PAPER_GUESS.test(entry.text)) return
+    post({ type: 'log', id: req.id, entry: { ...entry, text: entry.text.replace(REMOTE_PATH, '') } })
+  }
   currentLogger = log
 
   const engine = await loadWasm()
@@ -232,7 +241,7 @@ async function runScript(req: Extract<WorkerRequest, { type: 'run' }>) {
         if (args.length > 1 && !args[1].startsWith('-')) args = [args[0], 'ps', ...args.slice(2)]
       }
       // "@tut_data.txt", "@earth_relief_10m", ...: GMT would download these; use the bundled copies
-      const remote = resolveRemote(args)
+      const remote = resolveRemote(args, module)
       if (remote) {
         args = remote.args
         for (const n of remote.notes) log({ stream: 'info', text: `[NOTE]: ${n}`, line })
@@ -245,6 +254,20 @@ async function runScript(req: Extract<WorkerRequest, { type: 'run' }>) {
           FS.writeFile(`${REMOTE_DIR}/${f.file}`, new Uint8Array(data))
           mounted.add(REMOTE_DIR + '/' + f.file)
         }
+      }
+      // a window of a bundled global grid, cut the way GMT cuts it out of the server tiles
+      for (const c of remote?.cuts ?? []) {
+        if (mounted.has(c.out)) continue
+        try { FS.mkdirTree(dirname(c.out)) } catch { /* exists */ }
+        const saved = currentLogger
+        currentLogger = null
+        let st = -1
+        try { st = callGmt('grdcut', [`${REMOTE_DIR}/${c.file}`, `-R${c.region.join('/')}`, `-G${c.out}`]) } catch { /* handled below */ }
+        currentLogger = saved
+        if (st !== 0) {
+          log({ stream: 'info', text: `[NOTE]: could not cut the window ${c.region.join('/')} out of ${c.file}; using the whole grid`, line })
+          args = args.map((a) => a.split(c.out).join(`${REMOTE_DIR}/${c.file}`))
+        } else mounted.add(c.out)
       }
       if (module === 'coast') {
         const need = coastFilesFor(args)

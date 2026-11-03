@@ -17,7 +17,21 @@ export interface RemoteResolution {
   notes: string[]
   /** how to get data WebGMT does not have (download link, how to add it to the project), one line each */
   hints: string[]
+  /** windows to cut out of a bundled global grid before the command runs (see CUT_MODULES) */
+  cuts?: GridCut[]
 }
+
+export interface GridCut {
+  /** the bundled global grid (file under /gmt/remote/) */
+  file: string
+  region: [number, number, number, number]
+  /** path of the window in the Wasm file system; the command uses it instead of the global grid */
+  out: string
+}
+
+/** Commands that take their z range (and statistics) from the grid header, so they need the window, not the world.
+ *  GMT itself cuts the region out of the server tiles first; a bundled global file has to be cut the same way. */
+export const CUT_MODULES = new Set(['grdview', 'grdimage', 'grdcontour', 'grdinfo', 'grd2cpt', 'grd2xyz'])
 
 /** Tutorial and example files that are bundled unchanged. */
 const PLAIN = new Set(['tut_data.txt', 'tut_quakes.ngdc', 'tut_ship.xyz', 'tut_bathy.nc', 'tut_relief.nc', 'otemp.anal1deg.nc'])
@@ -87,13 +101,22 @@ export function cacheFileHint(name: string): string[] {
 
 /** Rewrites the "@name" arguments of one GMT command to bundled files, and explains how to add the data we do not
  *  have; returns null when there is nothing to do. */
-export function resolveRemote(args: string[]): RemoteResolution | null {
+export function resolveRemote(args: string[], module?: string): RemoteResolution | null {
   const files: RemoteFile[] = []
   const notes: string[] = []
   const hints: string[] = []
   const hinted = new Set<string>()
   const hint = (name: string, lines: string[]) => { if (!hinted.has(name)) { hinted.add(name); hints.push(...lines) } }
   const region = parseRegion(args)
+  const cuts: GridCut[] = []
+  const inGlobe = region && region[0] >= -180 && region[1] <= 180 && region[2] >= -90 && region[3] <= 90 && region[0] < region[1] && region[2] < region[3]
+  const cutOf = (file: string): string => {
+    if (!region || !inGlobe || !module || !CUT_MODULES.has(module)) return use(file)
+    use(file)
+    const out = `${REMOTE_DIR}/r${region.join('_')}/${file}`
+    if (!cuts.some((c) => c.out === out)) cuts.push({ file, region, out })
+    return out
+  }
   let touched = false
 
   const use = (file: string) => { if (!files.some((f) => f.file === file)) files.push({ file }); return `${REMOTE_DIR}/${file}` }
@@ -111,7 +134,7 @@ export function resolveRemote(args: string[]): RemoteResolution | null {
       }
       touched = true
       const res = m[1]
-      if (GLOBAL[res]) return use(GLOBAL[res])
+      if (GLOBAL[res]) return cutOf(GLOBAL[res])
       const sub = SUBSETS[res]
       if (sub && region && region[0] >= sub.w && region[1] <= sub.e && region[2] >= sub.s && region[3] <= sub.n) return use(sub.file)
       notes.push(
@@ -120,8 +143,8 @@ export function resolveRemote(args: string[]): RemoteResolution | null {
         `; using the bundled ${FALLBACK} global grid instead (coarser than requested)`,
       )
       hint(name, datasetHint(name, args))
-      return use(GLOBAL[FALLBACK])
+      return cutOf(GLOBAL[FALLBACK])
     })
   })
-  return touched || hints.length ? { args: out, files, notes, hints } : null
+  return touched || hints.length ? { args: out, files, notes, hints, ...(cuts.length ? { cuts } : {}) } : null
 }

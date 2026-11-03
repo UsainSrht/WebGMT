@@ -54,5 +54,19 @@ eq('parseRegion',parseRegion(['-JM5i', '-R-66/-60/30/35']), [-66, -60, 30, 35])
 eq('parseRegion global', parseRegion(['-Rg']), null)
 eq('parseRegion with +r', parseRegion(['-R10/20/30/40+r']), [10, 20, 30, 40])
 
+// windows of bundled global grids are cut, like GMT cuts them from the server tiles
+{
+  const r = resolveRemote(['@earth_relief_05m', '-R-66/-60/30/35', '-JM5i'], 'grdview')
+  eq('cut: arg points at the window', r?.args[0], '/gmt-remote/r-66_-60_30_35/earth_relief_05m_p.grd')
+  eq('cut: description', r?.cuts, [{ file: 'earth_relief_05m_p.grd', region: [-66, -60, 30, 35], out: '/gmt-remote/r-66_-60_30_35/earth_relief_05m_p.grd' }])
+  eq('cut: global file still loaded', r?.files, [{ file: 'earth_relief_05m_p.grd' }])
+  eq('no cut without a module', resolveRemote(['@earth_relief_05m', '-R-66/-60/30/35'])?.cuts, undefined)
+  eq('no cut for grdcut itself', resolveRemote(['@earth_relief_05m', '-R-66/-60/30/35'], 'grdcut')?.cuts, undefined)
+  eq('no cut for -Rg', resolveRemote(['@earth_relief_05m', '-Rg'], 'grdimage')?.cuts, undefined)
+  eq('no cut beyond the globe', resolveRemote(['@earth_relief_05m', '-R0/360/-90/90'], 'grdimage')?.cuts, undefined)
+  eq('cut: fallback grid is cut too', resolveRemote(['@earth_relief_01m', '-R0/10/0/10'], 'grdimage')?.cuts?.[0]?.file, 'earth_relief_10m_p.grd')
+  eq('tutorial subset is not cut', resolveRemote(['@earth_relief_30s', '-R-108/-103/35/40'], 'grdimage')?.cuts, undefined)
+}
+
 if (failed) { console.error(`${failed}/${total} remote tests failed`); process.exit(1) }
 console.log(`remote: ${total} checks passed`)

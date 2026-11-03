@@ -16,12 +16,12 @@ documentation PNG and compared by eye (geometry, labels, colours, line weights).
 | 7-8 | `plot` of `@tut_data.txt`, lines and symbols | same |
 | 9 | NCEI tsunami earthquakes on a Japan map | same |
 | 10 | text, fonts, `@~` Greek, `@!` overstrike | same after fixes 2 and 3 below |
-| 11 | `grdcontour @earth_relief_05m` | **differs by data, see below**; same style and annotations |
+| 11 | `grdcontour @earth_relief_05m` | same style, annotations and extent; **fewer small contours** (newer, smoother data, see below) |
 | 12-13 | `nearneighbor`/`surface` on `@tut_ship.xyz`, `mask` | same after fix 1 |
 | 14 | colour bars (discrete and continuous) | same |
 | 15-16 | `grdimage` with and without illumination | same |
-| 17 | `grdimage` of a netCDF slice, Hammer projection | same |
-| 18 | `grdview` mesh | **differs by data, see below**; axis labels same after fix 4 |
+| 17 | `grdimage` of a netCDF slice, Hammer projection | same; the 1 degree grid is interpolated, not drawn as big squares |
+| 18 | `grdview` mesh | same shape and axes after fixes 4 and 7; **less spiky** (newer, smoother data, see below) |
 | 19 | colour `grdview` with illumination | same |
 
 Text output: `gmt info @tut_data.txt` (`N = 7 <1/5> <1/5>`) and `gmt info @tut_ship.xyz`
@@ -30,12 +30,10 @@ Text output: `gmt info @tut_data.txt` (`N = 7 <1/5> <1/5>`) and `gmt info @tut_s
 
 ## Differences that remain
 
-- **Figures 11 and 18 use different data than the documentation images.** The images on the documentation site were
-  made from an older elevation grid and look rougher. With the current SRTM15+ v2.7 data that `@earth_relief_05m`
-  stands for (bundled here, global, 5 arc minutes) the same commands give smoother terrain and lower relief. Using the
-  legacy `@tut_bathy.nc` instead gives the same large features as the documentation but not every small contour, so
-  the documentation images cannot be reproduced exactly with any data we could find. The rendering itself is not at
-  fault: these figures use the same drawing code as the figures that match.
+- **Figures 11 and 18 use newer data than the documentation images.** The images on the documentation site were
+  made from an older, rougher elevation grid. With the current SRTM15+ v2.7 data that `@earth_relief_05m` stands for
+  (bundled here, global, 5 arc minutes) the same commands give the same large features but smoother terrain and fewer
+  small contours and spikes. The legacy `@tut_bathy.nc` (ETOPO5) reproduces the documentation figure 18 closely.
 - **`@earth_relief_*` is only partly available offline.** Bundled: 01d, 30m, 10m and 05m globally, and the
   tutorial's 30 arc-second region (-108/-103/35/40). Anything finer, or 30s elsewhere, uses the 10m grid and says so in
   the console.
@@ -56,3 +54,12 @@ Text output: `gmt info @tut_data.txt` (`N = 7 <1/5> <1/5>`) and `gmt info @tut_s
 5. A script without a figure (`gmt info ...`) was reported as "finished with errors"; it is now just "Done" with an
    informational line.
 6. Bundled data appeared in the console as `/gmt-remote/tut_data.txt`; the folder is hidden so output reads like GMT's.
+7. **Windows of a bundled global grid kept the whole globe's z range.** GMT cuts the region out of the server tiles
+   first, so `grdview` scales its vertical axis to the window; the bundled global file made figure 18 a flat sheet
+   floating above its axes. Commands that read the header (`grdview`, `grdimage`, `grdcontour`, `grd2cpt`, `grd2xyz`,
+   `grdinfo`) now get the requested window, cut with `grdcut` first.
+8. **Images were drawn as hard pixels at any scale**, so coarse grids looked like big squares and dense ones aliased.
+   Pixels are now only kept hard when the image is shown at about its own size.
+9. **Console colours.** GMT's `[WARNING]` and `[INFORMATION]` lines were red like errors. Warnings are amber,
+   information is grey and only errors are red; repeated lines are shown once with a count, and the "landscape
+   orientation" paper guess (WebGMT has no paper) is not shown.
