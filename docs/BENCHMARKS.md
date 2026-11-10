@@ -17,19 +17,19 @@ Native engine without start-up = native engine minus (number of gmt calls x the 
 
 | Workload | Native engine | WebGMT engine | Engine ratio | Native without start-up | Ratio without start-up | Native total | WebGMT total | Total ratio |
 |---|---|---|---|---|---|---|---|---|
-| noop | 35 ms [34-38] | 1 ms [1-1] | 0.0x | - | - | 40 ms [39-44] | 1 ms [1-1] | 0.0x |
-| basemap | 67 ms [63-77] | 5 ms [4-8] | 0.1x | 1 ms | 5.5x | 117 ms [109-128] | 7 ms [6-10] | 0.1x |
-| blockmedian-surface | 316 ms [310-339] | 442 ms [436-451] | 1.4x | 210 ms | 2.1x | 324 ms [318-347] | 444 ms [437-452] | 1.4x |
-| coast-global | 130 ms [127-136] | 62 ms [61-65] | 0.5x | 59 ms | 1.0x | 186 ms [182-194] | 107 ms [101-111] | 0.6x |
-| coast-mercator | 131 ms [128-136] | 81 ms [76-101] | 0.6x | 60 ms | 1.3x | 189 ms [186-197] | 175 ms [161-210] | 0.9x |
-| grdcontour-05m-window | 82 ms [79-88] | 16 ms [16-17] | 0.2x | 11 ms | 1.4x | 135 ms [132-142] | 33 ms [30-37] | 0.2x |
-| grdcut-global-05m | 184 ms [180-188] | 120 ms [114-125] | 0.7x | 113 ms | 1.1x | 190 ms [186-194] | 128 ms [120-132] | 0.7x |
-| grdgradient-global-05m | 1.04 s [1023-1193] | 1.18 s [1175-1199] | 1.1x | 973 ms | 1.2x | 1.05 s [1030-1200] | 1.19 s [1187-1212] | 1.1x |
-| grdimage-05m-window | 81 ms [78-84] | 15 ms [14-24] | 0.2x | 11 ms | 1.5x | 135 ms [133-143] | 27 ms [24-43] | 0.2x |
-| grdimage-global-05m | 3.38 s [3333-3505] | 3.39 s [3369-3450] | 1.0x | 3.31 s | 1.0x | 3.49 s [3440-3606] | 4.16 s [4148-4400] | 1.2x |
-| grdview-30s-window | 234 ms [227-256] | 123 ms [122-140] | 0.5x | 128 ms | 1.0x | 292 ms [283-315] | 137 ms [134-165] | 0.5x |
-| nearneighbor | 844 ms [820-876] | 1.01 s [999-1054] | 1.2x | 774 ms | 1.3x | 851 ms [827-883] | 1.01 s [1000-1055] | 1.2x |
-| plot-ship | 144 ms [139-158] | 240 ms [234-264] | 1.7x | 74 ms | 3.3x | 210 ms [203-222] | 7.20 s [7076-7518] | 34.4x |
+| basemap | 73 ms [70-74] | 4 ms [3-5] | 0.0x | 2 ms | 1.6x | 124 ms [121-128] | 5 ms [4-7] | 0.0x |
+| blockmedian-surface | 315 ms [313-324] | 460 ms [454-468] | 1.5x | 209 ms | 2.2x | 323 ms [319-332] | 461 ms [455-470] | 1.4x |
+| coast-global | 128 ms [126-133] | 62 ms [60-64] | 0.5x | 58 ms | 1.1x | 183 ms [182-189] | 86 ms [82-100] | 0.5x |
+| coast-mercator | 129 ms [127-133] | 80 ms [72-92] | 0.6x | 59 ms | 1.4x | 187 ms [184-199] | 139 ms [116-162] | 0.7x |
+| grdcontour-05m-window | 82 ms [81-84] | 18 ms [17-20] | 0.2x | 12 ms | 1.5x | 135 ms [133-138] | 33 ms [29-38] | 0.2x |
+| grdcut-global-05m | 183 ms [179-187] | 121 ms [118-135] | 0.7x | 112 ms | 1.1x | 189 ms [185-193] | 128 ms [125-142] | 0.7x |
+| grdgradient-global-05m | 1.02 s [1010-1043] | 1.22 s [1215-1231] | 1.2x | 954 ms | 1.3x | 1.03 s [1016-1049] | 1.23 s [1228-1247] | 1.2x |
+| grdimage-05m-window | 80 ms [79-96] | 16 ms [15-20] | 0.2x | 10 ms | 1.7x | 132 ms [130-148] | 29 ms [26-32] | 0.2x |
+| grdimage-global-05m | 3.29 s [3269-3507] | 3.49 s [3460-3514] | 1.1x | 3.22 s | 1.1x | 3.39 s [3368-3614] | 4.31 s [4263-4391] | 1.3x |
+| grdview-30s-window | 225 ms [221-242] | 128 ms [124-134] | 0.6x | 119 ms | 1.1x | 278 ms [276-300] | 142 ms [139-149] | 0.5x |
+| nearneighbor | 808 ms [793-828] | 1.05 s [1031-1071] | 1.3x | 738 ms | 1.4x | 815 ms [800-833] | 1.05 s [1032-1073] | 1.3x |
+| noop | 35 ms [35-37] | 1 ms [1-2] | 0.0x | - | - | 40 ms [39-41] | 1 ms [1-3] | 0.0x |
+| plot-ship | 139 ms [135-147] | 246 ms [242-274] | 1.8x | 69 ms | 3.6x | 202 ms [194-210] | 543 ms [534-626] | 2.7x |
 
 A ratio above 1 means WebGMT is slower.
 
@@ -37,19 +37,19 @@ A ratio above 1 means WebGMT is slower.
 
 | Workload | GMT worker | PostScript to SVG | PostScript | SVG | First run (cold engine state) | Browser memory growth |
 |---|---|---|---|---|---|---|
-| noop | 1 ms | - | - | - | n/a | n/a |
-| basemap | 5 ms | 2 ms | 23 kB | 8 kB | 5 ms | 97 MB |
-| blockmedian-surface | 442 ms | - | - | - | 490 ms | 241 MB |
-| coast-global | 62 ms | 44 ms | 262 kB | 506 kB | 79 ms | 97 MB |
-| coast-mercator | 81 ms | 93 ms | 463 kB | 1249 kB | 167 ms | 77 MB |
-| grdcontour-05m-window | 16 ms | 10 ms | 60 kB | 74 kB | 20 ms | 204 MB |
-| grdcut-global-05m | 120 ms | - | - | - | 118 ms | 213 MB |
-| grdgradient-global-05m | 1.18 s | - | - | - | 1.21 s | 233 MB |
-| grdimage-05m-window | 15 ms | 4 ms | 33 kB | 28 kB | 22 ms | 206 MB |
-| grdimage-global-05m | 3.39 s | 772 ms | 12467 kB | 12206 kB | 3.37 s | 322 MB |
-| grdview-30s-window | 123 ms | 14 ms | 138 kB | 129 kB | 156 ms | 194 MB |
-| nearneighbor | 1.01 s | - | - | - | 1.20 s | 166 MB |
-| plot-ship | 240 ms | 6.96 s | 1210 kB | 156532 kB | 264 ms | 395 MB |
+| basemap | 4 ms | 1 ms | 23 kB | 5 kB | 6 ms | 77 MB |
+| blockmedian-surface | 460 ms | - | - | - | 544 ms | 324 MB |
+| coast-global | 62 ms | 24 ms | 262 kB | 452 kB | 78 ms | 287 MB |
+| coast-mercator | 80 ms | 58 ms | 463 kB | 852 kB | 223 ms | 283 MB |
+| grdcontour-05m-window | 18 ms | 7 ms | 60 kB | 51 kB | 22 ms | 343 MB |
+| grdcut-global-05m | 121 ms | - | - | - | 124 ms | 231 MB |
+| grdgradient-global-05m | 1.22 s | - | - | - | 1.29 s | 506 MB |
+| grdimage-05m-window | 16 ms | 3 ms | 33 kB | 20 kB | 24 ms | 304 MB |
+| grdimage-global-05m | 3.49 s | 829 ms | 12467 kB | 12204 kB | 3.47 s | 412 MB |
+| grdview-30s-window | 128 ms | 13 ms | 138 kB | 126 kB | 162 ms | 349 MB |
+| nearneighbor | 1.05 s | - | - | - | 1.22 s | 229 MB |
+| noop | 1 ms | - | - | - | 6 ms | 58 MB |
+| plot-ship | 246 ms | 296 ms | 1210 kB | 5873 kB | 259 ms | 339 MB |
 
 Memory growth is the resident memory of the whole Chrome process tree after the workload minus the idle browser; it includes the Wasm heap, which only grows within a session.
 
@@ -57,7 +57,6 @@ Memory growth is the resident memory of the whole Chrome process tree after the 
 
 | Workload | Peak RSS of the script | PostScript |
 |---|---|---|
-| noop | 40 MB | - |
 | basemap | 40 MB | 23 kB |
 | blockmedian-surface | 47 MB | - |
 | coast-global | 49 MB | 263 kB |
@@ -69,15 +68,16 @@ Memory growth is the resident memory of the whole Chrome process tree after the 
 | grdimage-global-05m | 133 MB | 12467 kB |
 | grdview-30s-window | 53 MB | 138 kB |
 | nearneighbor | 46 MB | - |
+| noop | 40 MB | - |
 | plot-ship | 45 MB | 1210 kB |
 
 ## Start-up
 
 | | Time to the first finished figure |
 |---|---|
-| First visit (empty cache: download, compile, run) | 0.19 s |
-| Second visit (cached engine and data) | 0.10 s |
-| Native, one `basemap` script | 117 ms |
+| First visit (empty cache: download, compile, run) | 0.14 s |
+| Second visit (cached engine and data) | 0.09 s |
+| Native, one `basemap` script | 124 ms |
 
 Both are served from this machine, so the first visit has no real network time in it: add the download of the engine (see the download indicator in the app) for your connection.
 

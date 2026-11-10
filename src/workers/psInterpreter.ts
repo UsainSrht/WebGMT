@@ -10,7 +10,9 @@ type Mat = [number, number, number, number, number, number]
 type Obj = any
 interface Proc { proc: Obj[] }
 interface Name { name: string; lit: boolean }
-interface Seg { op: 'M' | 'L' | 'C' | 'Z'; p: number[] }
+/** A path segment in SVG coordinates. 'A' is a circular arc: p is its end point, a = [rx, ry, rotation, large-arc, sweep] and
+ *  bb the bounding box of the whole circle (so the page crop and stroke padding see the full extent). */
+interface Seg { op: 'M' | 'L' | 'C' | 'Z' | 'A'; p: number[]; a?: number[]; bb?: [number, number, number, number] }
 interface GState {
   ctm: Mat; path: Seg[]; cur: [number, number] | null; start: [number, number] | null
   fill: string; lw: number; cap: number; join: number; dash: number[]; dashPhase: number
@@ -71,6 +73,9 @@ const isName = (o: Obj): o is Name => o && typeof o === 'object' && typeof o.nam
 const isStr = (o: Obj) => o && typeof o === 'object' && typeof o.str === 'string'
 class Quit extends Error {}
 
+/** Largest distance, in points, between an arc and the straight segments it is drawn with. */
+const ARC_TOLERANCE = 0.02
+
 export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, value: unknown) => void } = {}): { svg: string; warnings: string[] } {
   const src = new TextDecoder('latin1').decode(psBytes)
   const extracted = extractImageData(src)   // inline image data is removed from the stream the tokenizer sees
@@ -106,10 +111,11 @@ export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, valu
   const num = (): number => { const v = ostack.pop(); return typeof v === 'number' ? v : Number(v?.str ?? 0) }
   const pt = (x: number, y: number) => { const [a, b] = apply(gs.ctm, x, y); return [a - bx0, H - (b - by0)] }
   const lookup = (n: string) => { for (let i = dstack.length - 1; i >= 0; i--) if (dstack[i].has(n)) return dstack[i].get(n) }
-  const fmt = (v: number) => +v.toFixed(3)
-  const pathD = (segs: Seg[]) => segs.map((s) => (s.op === 'Z' ? 'Z' : `${s.op}${s.p.map(fmt).join(' ')}`)).join('')
+  const fmt = (v: number) => Math.round(v * 1000) / 1000 // three decimals (about a thousandth of a point)
+  const pathD = (segs: Seg[]) => segs.map((s) => (s.op === 'Z' ? 'Z' : s.op === 'A' ? `A${s.a!.concat(s.p).map(fmt).join(' ')}` : `${s.op}${s.p.map(fmt).join(' ')}`)).join('')
   const addSeg = (op: Seg['op'], x: number, y: number, extra: number[] = []) => {
-    const p = pt(x, y).map(fmt)
+    const q = pt(x, y)
+    const p = [fmt(q[0]), fmt(q[1])]
     const e: number[] = []
     for (let i = 0; i < extra.length; i += 2) e.push(...pt(extra[i], extra[i + 1]).map(fmt))
     // In PostScript a moveto directly after a moveto replaces it (it is not a separate subpath)
@@ -126,16 +132,65 @@ export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, valu
     const w = Math.max(gs.lw * scaleOf(gs.ctm), 0.25)
     return `stroke-width="${fmt(w)}" stroke-linecap="${['butt', 'round', 'square'][gs.cap] ?? 'butt'}" stroke-linejoin="${['miter', 'round', 'bevel'][gs.join] ?? 'miter'}"${gs.dash.length ? ` stroke-dasharray="${gs.dash.map((d) => fmt(d * scaleOf(gs.ctm))).join(',')}" stroke-dashoffset="${fmt(gs.dashPhase * scaleOf(gs.ctm))}"` : ''}`
   }
+  // Consecutive paints are written as few SVG elements as is safe (a plot of 83,000 dots was 83,000 <path>s):
+  //  - a fill followed by a stroke of the same path (GMT's filled symbols with an outline) is one element: SVG paints
+  //    the fill first and the stroke over it, exactly the order of the two operators;
+  //  - neighbouring paints with identical style are one path with several subpaths. Everything here is opaque, so
+  //    overlaps look the same. Fills only merge when every subpath runs the same way round: with the nonzero rule
+  //    two overlapping shapes of opposite direction would cancel and leave a hole. Even-odd fills never merge, and
+  //    only paints that follow each other directly do, so the painting order does not change.
+  const MERGE_MAX = 2000
+  interface Rec { idx: number; ds: string[]; attrs: string; fillAttrs: string; kind: 'fill' | 'stroke' | 'eofill' | 'both'; sign: number; dirty: boolean }
+  const recs: Rec[] = []
+  let rec: Rec | null = null
+  /** +1 / -1: direction of a single simple closed polygon (or circle); 0: not safe to merge (several subpaths, curves, no area) */
+  const orient = (segs: Seg[]): number => {
+    let subs = 0
+    for (const s of segs) if (s.op === 'M') subs++
+    if (subs !== 1) return 0
+    if (segs.some((s) => s.op === 'A')) {
+      const ops = segs.filter((s) => s.op !== 'Z').map((s) => s.op).join('')
+      const a = segs.find((s) => s.op === 'A')
+      return ops === 'MAA' && a?.a ? (a.a[4] ? 1 : -1) : 0
+    }
+    if (segs.some((s) => s.op === 'C')) return 0
+    let area = 0, px = 0, py = 0, fx = 0, fy = 0, have = false
+    for (const s of segs) {
+      if (s.op === 'Z') continue
+      const x = s.p[s.p.length - 2], y = s.p[s.p.length - 1]
+      if (!have) { fx = x; fy = y; have = true } else area += px * y - x * py
+      px = x; py = y
+    }
+    area += px * fy - fx * py
+    return area > 0 ? 1 : area < 0 ? -1 : 0
+  }
   const paint = (mode: 'fill' | 'stroke' | 'eofill') => {
     if (gs.path.length === 0) return
     const runs = gs.runs
     const segs = runs.length ? gs.path.filter((_, i) => !runs.some((r) => i >= r.from && i < r.to)) : gs.path
     const pad = mode === 'stroke' ? Math.max(gs.lw * scaleOf(gs.ctm), 0.05) / 2 : 0
-    for (const sg of segs) for (let i = 0; i + 1 < sg.p.length; i += 2) grow(sg.p[i], sg.p[i + 1], pad)
+    for (const sg of segs) {
+      for (let i = 0; i + 1 < sg.p.length; i += 2) grow(sg.p[i], sg.p[i + 1], pad)
+      if (sg.bb) { grow(sg.bb[0], sg.bb[1], pad); grow(sg.bb[2], sg.bb[3], pad) }
+    }
     if (segs.length) {
       const d = pathD(segs)
-      if (mode === 'stroke') out.push(`<path d="${d}" fill="none" stroke="${gs.fill}" ${strokeAttrs()}/>`)
-      else out.push(`<path d="${d}" fill="${gs.fill}" fill-rule="${mode === 'eofill' ? 'evenodd' : 'nonzero'}" stroke="none"/>`)
+      const fillAttrs = mode === 'stroke' ? '' : `fill="${gs.fill}" fill-rule="${mode === 'eofill' ? 'evenodd' : 'nonzero'}"`
+      const attrs = mode === 'stroke' ? `fill="none" stroke="${gs.fill}" ${strokeAttrs()}` : `${fillAttrs} stroke="none"`
+      const last = rec && out.length - 1 === rec.idx ? rec : null
+      if (last && mode === 'stroke' && (last.kind === 'fill' || last.kind === 'eofill') && last.ds.length === 1 && last.ds[0] === d) {
+        last.attrs = `${last.fillAttrs} stroke="${gs.fill}" ${strokeAttrs()}`
+        last.kind = 'both'; last.dirty = true
+      } else {
+        const sign = mode === 'fill' ? orient(segs) : 0
+        if (last && last.kind === mode && last.attrs === attrs && last.ds.length < MERGE_MAX && (mode === 'stroke' || (sign !== 0 && sign === last.sign))) {
+          last.ds.push(d); last.dirty = true
+        } else {
+          out.push(`<path d="${d}" ${attrs}/>`)
+          rec = { idx: out.length - 1, ds: [d], attrs, fillAttrs, kind: mode, sign, dirty: false }
+          recs.push(rec)
+        }
+      }
     }
     for (const r of runs) {
       // text is drawn in user units (the matrix carries the scale), so the outline width is in user units too
@@ -190,9 +245,34 @@ export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, valu
   }
 
   const arc = (cx: number, cy: number, r: number, a1: number, a2: number, ccw: boolean) => {
-    let s = (a1 * Math.PI) / 180, e = (a2 * Math.PI) / 180
+    const s = (a1 * Math.PI) / 180
+    let e = (a2 * Math.PI) / 180
     if (ccw) { while (e < s) e += 2 * Math.PI } else { while (e > s) e -= 2 * Math.PI }
-    const n = Math.max(4, Math.ceil(Math.abs(e - s) / (Math.PI / 60)))
+    const m = gs.ctm
+    const sx = Math.hypot(m[0], m[1]), sy = Math.hypot(m[2], m[3])
+    // A full circle under a uniform scale (rotation and mirroring allowed) is written as two SVG arcs: a third of the
+    // path data and work of a polygon, and exactly round at any zoom. Anything else is drawn as straight segments.
+    if (r > 0 && sx > 0 && Math.abs(Math.abs(e - s) - 2 * Math.PI) < 1e-9 && Math.abs(sx - sy) <= 1e-6 * sx && Math.abs(m[0] * m[2] + m[1] * m[3]) <= 1e-6 * sx * sy) {
+      const ux = cx + r * Math.cos(s), uy = cy + r * Math.sin(s)
+      const c = pt(cx, cy), p0 = pt(ux, uy), p1 = pt(cx - r * Math.cos(s), cy - r * Math.sin(s)), q = pt(cx + r * Math.cos(s + Math.PI / 2), cy + r * Math.sin(s + Math.PI / 2))
+      // which way round in SVG's (y down) space: increasing angle is "positive" when q is a quarter turn from p0 that way
+      const cross = (p0[0] - c[0]) * (q[1] - c[1]) - (p0[1] - c[1]) * (q[0] - c[0])
+      const sweep = (cross > 0) === ccw ? 1 : 0
+      const rs = fmt(r * sx)
+      const bb: [number, number, number, number] = [c[0] - rs, c[1] - rs, c[0] + rs, c[1] + rs]
+      if (!gs.cur) { addSeg('M', ux, uy); gs.start = dev(ux, uy) } else addSeg('L', ux, uy)
+      gs.path.push({ op: 'A', p: [fmt(p1[0]), fmt(p1[1])], a: [rs, rs, 0, 0, sweep], bb })
+      gs.path.push({ op: 'A', p: [fmt(p0[0]), fmt(p0[1])], a: [rs, rs, 0, 0, sweep], bb })
+      gs.cur = dev(ux, uy)
+      return
+    }
+    // The arc is drawn as straight segments. Their number follows the size on the page: a segment may sit at most
+    // ARC_TOLERANCE (points) away from the true circle. A 0.5 pt arc then needs about 12 segments, not the 120 a
+    // fixed step gave; large arcs keep the old 3 degree step as the finest one.
+    const rDev = Math.abs(r) * scaleOf(gs.ctm)
+    const finest = Math.PI / 60
+    const step = rDev > ARC_TOLERANCE ? Math.max(finest, 2 * Math.acos(1 - ARC_TOLERANCE / rDev)) : Math.PI / 2
+    const n = Math.max(4, Math.ceil(Math.abs(e - s) / step))
     for (let i = 0; i <= n; i++) {
       const a = s + ((e - s) * i) / n
       const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a)
@@ -420,6 +500,10 @@ export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, valu
         const [ux, uy] = apply(i, sg.p[k] + bx0, H - sg.p[k + 1] + by0)
         x0 = Math.min(x0, ux); y0 = Math.min(y0, uy); x1 = Math.max(x1, ux); y1 = Math.max(y1, uy)
       }
+      for (const sg of gs.path) if (sg.bb) for (const [bx, by] of [[sg.bb[0], sg.bb[1]], [sg.bb[2], sg.bb[3]]]) {
+        const [ux, uy] = apply(i, bx + bx0, H - by + by0)
+        x0 = Math.min(x0, ux); y0 = Math.min(y0, uy); x1 = Math.max(x1, ux); y1 = Math.max(y1, uy)
+      }
       if (!isFinite(x0)) { ostack.push(0, 0, 0, 0); return }
       ostack.push(x0, y0, x1, y1)
     },
@@ -478,6 +562,7 @@ export function psToSvg(psBytes: ArrayBuffer, opts: { onDef?: (key: string, valu
     if (!(e instanceof Quit) && !(e instanceof ExitLoop)) warnings.add(`interpreter error: ${(e as Error).message}`)
   }
   while (gs.clipDepth-- > 0) out.push('</g>')
+  for (const r of recs) if (r.dirty) out[r.idx] = `<path d="${r.ds.join('')}" ${r.attrs}/>`
   const M = 10
   const cropped = isFinite(bnd.x0) && bnd.x1 > bnd.x0 && bnd.y1 > bnd.y0
   // Crop to what was painted. Not clamped to the page: figures (e.g. stacked panels via -Y) can be larger than one page.

@@ -12,7 +12,7 @@ documentation PNG and compared by eye (geometry, labels, colours, line weights).
 | Figure | Content | Result |
 |---|---|---|
 | 1-2 | linear and log basemap | same |
-| 3-6 | Mercator, Albers, orthographic, Eckert VI coastlines | same (hairline seams between land polygons are slightly more visible in a browser) |
+| 3-6 | Mercator, Albers, orthographic, Eckert VI coastlines | same (the hairline seams between neighbouring land polygons are largely gone: same-colour polygons that follow each other are drawn as one path) |
 | 7-8 | `plot` of `@tut_data.txt`, lines and symbols | same |
 | 9 | NCEI tsunami earthquakes on a Japan map | same |
 | 10 | text, fonts, `@~` Greek, `@!` overstrike | same after fixes 2 and 3 below |
@@ -63,3 +63,8 @@ Text output: `gmt info @tut_data.txt` (`N = 7 <1/5> <1/5>`) and `gmt info @tut_s
 9. **Console colours.** GMT's `[WARNING]` and `[INFORMATION]` lines were red like errors. Warnings are amber,
    information is grey and only errors are red; repeated lines are shown once with a count, and the "landscape
    orientation" paper guess (WebGMT has no paper) is not shown.
+10. **SVG size and speed.** Every circle was 120 line segments and every symbol its own `<path>`, so 83,000 dots made a
+    156 MB SVG that took 7 s to build. Full circles are now two SVG arcs, coordinates are rounded once, a fill and the
+    outline of the same path are one element, and neighbouring paints of identical style are one path (never across
+    a clip, a colour change or an opposite winding direction). The same figure is 5.9 MB and builds in 0.3 s; the
+    vector figures are up to 60% smaller (those that are mostly raster images are unchanged) and look the same.
