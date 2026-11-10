@@ -9,3 +9,7 @@ dist/
 Thumbs.db
 *.tsbuildinfo
 .vscode/
+
+# benchmark output (see bench/README.md): built page and raw results are local
+dist-bench/
+bench/results/

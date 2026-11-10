@@ -75,6 +75,10 @@ Needs Docker with ~8 GB RAM available to the VM; every parallel build step is ca
 
 `npm test` runs `tests/awk.test.ts` (our awk against the system awk, 16 programs), `tests/shell.test.ts` (pipes, heredocs, substitution, loops, error behaviour) and `tests/files.test.ts` (path helpers, text/image/binary detection), `tests/remote.test.ts` (`@name` rewriting) and `tests/ps.test.ts` (PostScript interpreter regressions) and `tests/downloads.test.ts` (progress, speed, ETA, averages). The Wasm engine, renderer and explorer UI have no automated tests in the repository; they were checked by driving headless Chrome and comparing the output with real GMT results.
 
+## Benchmark
+
+`bench/` compares WebGMT with the native GMT 6.6.0 CLI (run in Docker) on the same scripts: `npm run bench`. It is for people who want to measure on their own machine and is kept out of the website: `src/` does not use it, `npm run build` does not build it and `npm run verify:dist` fails if any of it reaches `dist/`. See `bench/README.md`.
+
 ## License
 
 WebGMT is MIT licensed (see [LICENSE](LICENSE)), made by [UsainSrht](https://github.com/UsainSrht). It bundles GMT (LGPL-3.0-or-later) and other third-party code and data; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). WebGMT is not affiliated with the GMT project.

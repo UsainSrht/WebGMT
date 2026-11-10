@@ -1,0 +1,12 @@
+[
+  { "name": "info", "data": ["tut_ship.xyz"] },
+  { "name": "blockmedian", "data": ["tut_ship.xyz"] },
+  { "name": "surface", "data": ["tut_ship.xyz"] },
+  { "name": "nearneighbor", "data": ["tut_ship.xyz"] },
+  { "name": "grdgradient", "data": ["earth_relief_05m_p.grd"] },
+  { "name": "grdcut", "data": ["earth_relief_05m_p.grd"] },
+  { "name": "grdmath", "data": [] },
+  { "name": "grdinfo-window", "data": ["earth_relief_05m_p.grd"] },
+  { "name": "makecpt", "data": [] },
+  { "name": "grdinfo-relief", "data": ["tut_relief.nc"] }
+]

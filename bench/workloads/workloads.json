@@ -1,0 +1,15 @@
+[
+  { "name": "noop", "group": "startup", "data": [], "what": "one tiny gmt call: the fixed cost of a call" },
+  { "name": "basemap", "group": "light", "data": [], "what": "empty basemap with frame" },
+  { "name": "coast-mercator", "group": "light", "data": ["coast"], "what": "intermediate-resolution coastlines, Mercator" },
+  { "name": "coast-global", "group": "light", "data": ["coast"], "what": "low-resolution global coastlines, Hammer, filled" },
+  { "name": "plot-ship", "group": "data", "data": ["tut_ship.xyz"], "what": "82,970 symbols" },
+  { "name": "blockmedian-surface", "group": "data", "data": ["tut_ship.xyz"], "what": "block median + minimum curvature surface" },
+  { "name": "nearneighbor", "group": "data", "data": ["tut_ship.xyz"], "what": "nearest-neighbour gridding" },
+  { "name": "grdimage-05m-window", "group": "grid", "data": ["earth_relief_05m_p.grd"], "what": "image of a 6x5 degree window of the 05m globe" },
+  { "name": "grdcontour-05m-window", "group": "grid", "data": ["earth_relief_05m_p.grd"], "what": "contours of the same window" },
+  { "name": "grdview-30s-window", "group": "grid", "data": ["tut_relief.nc"], "what": "3-D illuminated view of the 30 arc-second tutorial grid" },
+  { "name": "grdgradient-global-05m", "group": "heavy", "data": ["earth_relief_05m_p.grd"], "what": "gradient of 9.3 million nodes" },
+  { "name": "grdcut-global-05m", "group": "heavy", "data": ["earth_relief_05m_p.grd"], "what": "cut a window out of the 05m globe" },
+  { "name": "grdimage-global-05m", "group": "heavy", "data": ["earth_relief_05m_p.grd"], "what": "shaded image of the whole 05m globe" }
+]

@@ -14,7 +14,12 @@
     "build": "node scripts/gen-manifest.mjs && tsc --noEmit && vite build",
     "preview": "vite preview",
     "verify:dist": "node scripts/verify-dist.mjs",
-    "test": "node scripts/test.mjs"
+    "test": "node scripts/test.mjs",
+    "bench": "node bench/native/run.mjs && node bench/web/run.mjs && node bench/compare.mjs",
+    "bench:native": "node bench/native/run.mjs",
+    "bench:web": "node bench/web/run.mjs",
+    "bench:compare": "node bench/compare.mjs",
+    "bench:check": "node bench/check.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
