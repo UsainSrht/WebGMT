@@ -14,6 +14,9 @@ const bench = path.resolve(here, '..')
 const root = path.resolve(bench, '..')
 const a = args()
 const reps = +(a.reps ?? 10), warmup = +(a.warmup ?? 2)
+// --engine DIR: use gmt.js and gmt.wasm from DIR (an engine build under test) instead of public/gmt
+const engineDir = typeof a.engine === 'string' ? path.resolve(a.engine) : null
+if (engineDir && !existsSync(path.join(engineDir, 'gmt.wasm'))) { console.error(`--engine: ${engineDir}/gmt.wasm not found`); process.exit(1) }
 const only = typeof a.only === 'string' ? a.only.split(',') : null
 const wdir = typeof a.dir === 'string' ? path.resolve(a.dir) : path.join(bench, 'workloads')
 const results = typeof a.out === 'string' ? path.resolve(a.out) : path.join(bench, 'results')
@@ -33,8 +36,9 @@ for (const f of ['gmt/gmt.wasm', 'gmt/gmt.js']) {
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.json': 'application/json', '.css': 'text/css', '.txt': 'text/plain' }
 const server = createServer((req, res) => {
   const url = decodeURIComponent(new URL(req.url, 'http://x').pathname)
-  const file = url.startsWith('/gmt/') ? path.join(root, 'public', url) : path.join(dist, url === '/' ? 'index.html' : url)
-  if (!file.startsWith(root) || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404); return res.end() }
+  const own = engineDir && ['/gmt/gmt.js', '/gmt/gmt.wasm'].includes(url) ? path.join(engineDir, path.basename(url)) : null
+  const file = own ?? (url.startsWith('/gmt/') ? path.join(root, 'public', url) : path.join(dist, url === '/' ? 'index.html' : url))
+  if (!(own || file.startsWith(root)) || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404); return res.end() }
   const st = statSync(file)
   const etag = `"${st.size}-${Math.floor(st.mtimeMs)}"`
   const headers = {
@@ -139,7 +143,7 @@ console.log(`  ${warm.ms.toFixed(0)} ms`)
 
 writeFileSync(path.join(results, 'web.json'), JSON.stringify({
   kind: 'web', date: new Date().toISOString(), browser: version, cores: info.cores, isolated: info.isolated, reps, warmup,
-  machine: machine(), startup: { firstVisitMs: cold.ms, secondVisitMs: warm.ms }, firstRunMs: firsts, idleRssBytes: idleRss, rssBytes: memory, runs, stdout: outputs,
+  engine: engineDir ?? 'public/gmt', machine: machine(), startup: { firstVisitMs: cold.ms, secondVisitMs: warm.ms }, firstRunMs: firsts, idleRssBytes: idleRss, rssBytes: memory, runs, stdout: outputs,
 }, null, 1))
 console.log(`web: ${runs.length} runs written to bench/results/web.json (${version})`)
 cleanup()

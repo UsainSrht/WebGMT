@@ -1,6 +1,7 @@
 // npm run bench:check [-- --no-build]
 // Do both sides compute the same thing? Runs the scripts in bench/check/ once on native GMT and once in WebGMT and
-// compares what they print (grid statistics, data ranges, colour tables). Numbers must agree to 6 significant digits.
+// compares what they print (grid statistics, data ranges, colour tables). Numbers must agree to 6 significant digits;
+// scripts marked "exact" in check/workloads.json (they print 17 digits, so every bit of a parsed number shows) must be identical text.
 // Exit code 1 if anything differs. Results go to a temporary folder, not bench/results.
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
@@ -8,6 +9,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { args } from './lib.mjs'
+
+const exact = new Set(JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'check', 'workloads.json'), 'utf8')).filter((w) => w.exact).map((w) => w.name))
 
 const bench = path.dirname(fileURLToPath(import.meta.url))
 const out = mkdtempSync(path.join(os.tmpdir(), 'webgmt-check-'))
@@ -37,7 +40,7 @@ for (const name of Object.keys(native)) {
   const a = lines(native[name]), b = lines(web[name])
   const diffs = []
   if (a.length !== b.length) diffs.push(`line count ${a.length} native vs ${b.length} WebGMT`)
-  a.forEach((l, i) => { if (b[i] !== undefined && !same(l, b[i])) diffs.push(`native: ${l}\n    web:    ${b[i]}`) })
+  a.forEach((l, i) => { if (b[i] !== undefined && !(exact.has(name) ? l === b[i] : same(l, b[i]))) diffs.push(`native: ${l}\n    web:    ${b[i]}`) })
   if (!a.length) diffs.push('native printed nothing')
   console.log(name.padEnd(18) + String(a.length).padEnd(7) + (diffs.length ? 'DIFFERENT' : 'same'))
   if (diffs.length) { bad++; for (const d of diffs.slice(0, 3)) console.log('    ' + d) }

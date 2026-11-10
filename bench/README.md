@@ -23,6 +23,7 @@ Options go after `--`, for example `npm run bench:web -- --reps 20 --only plot-s
 | `--warmup N` | 2 | runs that are not counted (the first one loads data and warms caches) |
 | `--dir PATH` | workloads/ | use your own folder of workloads (same layout) |
 | `--out DIR` | results/ | where the result files go |
+| `--engine DIR` | public/gmt | web only: use `gmt.js` and `gmt.wasm` from this folder (an engine build under test) |
 | `--only a,b` | all | workload names (file names in `workloads/`, without `.sh`) |
 | `--cpus N` | 1 | native only: CPU limit of the container |
 | `--no-build` | | skip rebuilding the Docker image / the benchmark page |

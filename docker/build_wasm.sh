@@ -43,8 +43,13 @@ int curl_easy_perform(void *handle) { (void)handle; return 7; }
 DLEOF
 } > /tmp/gmt_dl.cpp
 
+# GMT reads the numbers of a text table with strtod (and the coordinates of geographic data with sscanf "%lf"), and Emscripten's libc does that in software 128-bit floating
+# point (about 650 ns per number, 14x slower than glibc). fast_strtod.c converts the common case exactly in one
+# operation and hands everything else to the original; --wrap routes the calls there. See docs/ENGINE-PERFORMANCE.md.
+emcc -O2 -c /src/fast_strtod.c -o /tmp/fast_strtod.o
+
 # em++ because libgdal/libproj are C++
-em++ /src/gmt_wasm_wrapper.c /tmp/gmt_dl.cpp -O2 \
+em++ /src/gmt_wasm_wrapper.c /tmp/gmt_dl.cpp /tmp/fast_strtod.o -O2 \
   -I/gmt-install/include/gmt -I/libs/include \
   /gmt-install/lib/libgmt.a /gmt-install/lib/libpostscriptlight.a \
   /libs/lib/libgdal.a /libs/lib/libproj.a /libs/lib/libsqlite3.a /libs/lib/libcurl.a \
@@ -53,7 +58,7 @@ em++ /src/gmt_wasm_wrapper.c /tmp/gmt_dl.cpp -O2 \
   -s MODULARIZE=1 -s EXPORT_ES6=1 -s EXPORT_NAME=createGMT -s ENVIRONMENT=worker \
   -s EXPORTED_FUNCTIONS='["_malloc","_free","_execute_gmt_command","_execute_gmt_command_ex"]' \
   -s EXPORTED_RUNTIME_METHODS='["FS","ENV","ccall","cwrap","setValue","stringToUTF8","lengthBytesUTF8"]' \
-  -Wl,--allow-multiple-definition -lidbfs.js \
+  -Wl,--allow-multiple-definition -Wl,--wrap=strtod -Wl,--wrap=sscanf -lidbfs.js \
   --embed-file "$SHARE"@/gmt-install/share \
   -o "$OUT/gmt.js"
 

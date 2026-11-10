@@ -89,7 +89,7 @@ RUN curl -fsSL https://github.com/GenericMappingTools/gmt/releases/download/6.6.
 # NOTE: the standalone `gmt` executable does not link against the static GDAL (PIC mismatch) and is not needed:
 # build_wasm.sh links libgmt.a with gmt_wasm_wrapper.c instead.
 
-COPY gmt_wasm_wrapper.c build_wasm.sh /src/
+COPY gmt_wasm_wrapper.c fast_strtod.c build_wasm.sh /src/
 RUN chmod +x /src/build_wasm.sh && /src/build_wasm.sh
 
 # Artifacts end up in /out (gmt.js, gmt.wasm, gmt.data share files)

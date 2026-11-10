@@ -8,5 +8,9 @@
   { "name": "grdmath", "data": [] },
   { "name": "grdinfo-window", "data": ["earth_relief_05m_p.grd"] },
   { "name": "makecpt", "data": [] },
-  { "name": "grdinfo-relief", "data": ["tut_relief.nc"] }
+  { "name": "grdinfo-relief", "data": ["tut_relief.nc"] },
+  { "name": "parse-text", "data": ["tut_ship.xyz"], "exact": true, "what": "every number of a text table, printed with 17 digits: must match to the last bit" },
+  { "name": "parse-geo", "data": ["tut_ship.xyz"], "exact": true, "what": "the same read as longitude/latitude (the sscanf path)" },
+  { "name": "parse-quakes", "data": ["tut_quakes.ngdc"], "exact": true, "what": "a table with a header and mixed columns" },
+  { "name": "parse-small", "data": ["tut_data.txt"], "exact": true, "what": "a tiny table" }
 ]

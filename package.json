@@ -15,6 +15,7 @@
     "preview": "vite preview",
     "verify:dist": "node scripts/verify-dist.mjs",
     "test": "node scripts/test.mjs",
+    "test:parse": "node scripts/test-parse.mjs",
     "bench": "node bench/native/run.mjs && node bench/web/run.mjs && node bench/compare.mjs",
     "bench:native": "node bench/native/run.mjs",
     "bench:web": "node bench/web/run.mjs",

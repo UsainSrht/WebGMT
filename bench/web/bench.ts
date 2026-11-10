@@ -2,7 +2,7 @@
 import { psToSvg } from '../../src/workers/psInterpreter'
 
 interface Workload { name: string; script: string; data: string[] }
-interface RunResult { workload: string; iter: number; engineMs: number; roundtripMs: number; svgMs: number; psBytes: number; svgBytes: number; ok: boolean }
+interface RunResult { psHash: string; workload: string; iter: number; engineMs: number; roundtripMs: number; svgMs: number; psBytes: number; svgBytes: number; ok: boolean }
 
 const dataFiles = new Map<string, ArrayBuffer>()
 async function file(name: string): Promise<ArrayBuffer | null> {
@@ -30,6 +30,14 @@ function newWorker() {
   return worker
 }
 
+/** A fingerprint of a figure's PostScript without its comment lines (dates, echoed commands): two engines that compute
+ *  the same thing give the same fingerprint. */
+async function fingerprint(ps: ArrayBuffer): Promise<string> {
+  const text = new TextDecoder('latin1').decode(ps).split('\n').filter((l) => !l.startsWith('%')).join('\n')
+  const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))
+  return [...d.slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 async function runOnce(script: string, data: string[]) {
   const files: { name: string; data: ArrayBuffer }[] = []
   for (const n of data) { const d = await file(n); if (d) files.push({ name: n, data: d }) }
@@ -40,16 +48,17 @@ async function runOnce(script: string, data: string[]) {
   worker!.postMessage({ type: 'run', id, script, cwd: '', files: files.map((f) => ({ name: f.name, data: f.data.slice(0) })) })
   const m = await done
   const roundtripMs = performance.now() - t0
-  let svgMs = 0, psBytes = 0, svgBytes = 0
+  let svgMs = 0, psBytes = 0, svgBytes = 0, psHash = ''
   for (const f of m.figures as { ps?: ArrayBuffer }[]) {
     if (!f.ps) continue
     psBytes += f.ps.byteLength
+    psHash += (psHash ? '+' : '') + (await fingerprint(f.ps))
     const t = performance.now()
     const { svg } = psToSvg(f.ps)
     svgMs += performance.now() - t
     svgBytes += svg.length
   }
-  return { ok: m.ok as boolean, engineMs: m.durationMs as number, roundtripMs, svgMs, psBytes, svgBytes, engine: m.engine as string, stdout: stdout.join('\n') }
+  return { psHash, ok: m.ok as boolean, engineMs: m.durationMs as number, roundtripMs, svgMs, psBytes, svgBytes, engine: m.engine as string, stdout: stdout.join('\n') }
 }
 
 const api = {
@@ -72,7 +81,7 @@ const api = {
       if (i === 0) first = { engineMs: r.engineMs }
       lastStdout = r.stdout
       if (i < warmup) continue
-      runs.push({ workload: w.name, iter: i - warmup + 1, engineMs: r.engineMs, roundtripMs: r.roundtripMs, svgMs: r.svgMs, psBytes: r.psBytes, svgBytes: r.svgBytes, ok: r.ok })
+      runs.push({ workload: w.name, iter: i - warmup + 1, engineMs: r.engineMs, roundtripMs: r.roundtripMs, svgMs: r.svgMs, psBytes: r.psBytes, svgBytes: r.svgBytes, psHash: r.psHash, ok: r.ok })
     }
     return { runs, first, stdout: lastStdout }
   },

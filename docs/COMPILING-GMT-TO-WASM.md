@@ -70,6 +70,7 @@ Key decisions (each is a fix for a failure in section 4):
 - `--embed-file <share>@/gmt-install/share`: embed the data **at the path GMT has compiled in** (M19).
 - Generate a `dlopen`/`dlsym` replacement from `llvm-nm` output of `libgmt.a` (M19b), and link with `-Wl,--allow-multiple-definition` so ours wins over libc's.
 - Trim the embedded share data (`mgd77`, `spotter`, `mgg`, `x2sys`, `tools`, `localization`): it was 19 MB of the 29 MB module (M21).
+- `fast_strtod.c` + `-Wl,--wrap=strtod -Wl,--wrap=sscanf`: Emscripten's libc parses floating-point text in software 128-bit arithmetic, 14x slower than glibc, and GMT does that for every number it reads. The replacement is exact and falls back to the original for everything unusual. See [ENGINE-PERFORMANCE.md](ENGINE-PERFORMANCE.md) (cause, proof, `npm run test:parse`).
 
 ### The wrapper
 
